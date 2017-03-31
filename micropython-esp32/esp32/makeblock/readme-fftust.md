@@ -620,3 +620,6 @@ volatile bool    rsp_be_received = false;
 volatile bool    pure_command_mode = true;
 
 未volatile关键字 上发传感器数据死机；
+
+add
+
