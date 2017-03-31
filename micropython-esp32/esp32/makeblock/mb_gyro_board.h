@@ -65,7 +65,7 @@ uint8_t i2cData[14];
 uint8_t Device_Address;
 
 #define I2C_SCL_IO    18    /*!< gpio number for I2C master clock */
-#define I2C_SDA_IO    19    /*!< gpio number for I2C master data  */
+#define I2C_SDA_IO    19   /*!< gpio number for I2C master data  */
 #define I2C_NUM    I2C_NUM_1   /*!< I2C port number for master dev */
 #define I2C_TX_BUF_DISABLE   0   /*!< I2C master do not need buffer */
 #define I2C_RX_BUF_DISABLE   0   /*!< I2C master do not need buffer */
@@ -83,8 +83,6 @@ uint8_t Device_Address;
 extern const mp_obj_type_t mb_gyro_board_type;
 extern void mb_gyro_board_value_cmd(uint8_t index, uint8_t port,uint8_t axis);
 extern void i2c_master_init();
-extern void gyro_board_init();
-
 
 
 #endif //  MeGyro_H

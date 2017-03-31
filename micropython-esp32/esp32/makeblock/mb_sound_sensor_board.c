@@ -48,97 +48,97 @@
 #include "mb_sound_sensor_board.h"
 #include "mb_processcmd.h"
 	
-	/******************************************************************************
-	 MACRO DEFINITION
-	 ******************************************************************************/
-	#define MB_POTENTIONMETER_BOARD_CHANNEL ADC2_CHANNEL_6 
-	/******************************************************************************
-	 DECLARE CONSTANTS
-	 ******************************************************************************/
-	
-	/******************************************************************************
-	 DEFINE TYPES
-	 ******************************************************************************/
-	typedef struct
-	{
-	  mp_obj_base_t base;
-	} mb_sound_sensor_board_obj_t;
-	
-	/******************************************************************************
-	 DECLARE PRIVATE DATA
-	 ******************************************************************************/
-	STATIC mb_sound_sensor_board_obj_t mb_sound_sensor_board_obj = {};
-	
-	/******************************************************************************
-	 DECLARE PRIVATE FUNCTIONS
-	 ******************************************************************************/
-	
-	/******************************************************************************
-	 DEFINE PUBLIC FUNCTIONS
-	 ******************************************************************************/
-	
-	
-	/******************************************************************************/
-	
-    STATIC mp_obj_t mb_sound_sensor_board_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
-	{
-	  // parse args
-	  mp_map_t kw_args;
-	  mp_map_init_fixed_table(&kw_args, n_kw, all_args + n_args);
-	
-	  mb_sound_sensor_board_config();
-	  // setup the object
-	  mb_sound_sensor_board_obj_t *self = &mb_sound_sensor_board_obj;
-	  self->base.type = &mb_sound_sensor_board_type;
-	  return self;
-	}
-	
-	STATIC void mb_sound_sensor_board_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
-	{
-	
-	}
-  
-    void mb_sound_sensor_board_config()  
-	{  
-    adc2_config_width(ADC_WIDTH_12Bit);
-    adc2_config_channel_atten(MB_SOUND_SENSOR_BOARD_CHANNEL,ADC_ATTEN_11db);
+/******************************************************************************
+ MACRO DEFINITION
+ ******************************************************************************/
+ #define MB_POTENTIONMETER_BOARD_CHANNEL ADC2_CHANNEL_6 
+/******************************************************************************
+ DECLARE CONSTANTS
+ ******************************************************************************/
 
-	}
+/******************************************************************************
+ DEFINE TYPES
+ ******************************************************************************/
+typedef struct
+{
+  mp_obj_base_t base;
+} mb_sound_sensor_board_obj_t;
 
-	STATIC mp_obj_t mb_sound_sensor_board_value(mp_uint_t n_args, const mp_obj_t *args)
-	{
-      float value=0;
-	  value=(float)(adc2_get_voltage(MB_SOUND_SENSOR_BOARD_CHANNEL));
+/******************************************************************************
+ DECLARE PRIVATE DATA
+ ******************************************************************************/
+STATIC mb_sound_sensor_board_obj_t mb_sound_sensor_board_obj = {};
 
-	  return mp_obj_new_float(value);
-	}
-	
-	STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mb_sound_sensor_board_value_obj,1, 1, mb_sound_sensor_board_value);
-    //MP_DEFINE_CONST_FUN_OBJ_3(mb_potention_meter_board_value_obj, mb_potention_meter_board_value);
-	
-	
-	STATIC mp_obj_t mb_sound_sensor_board_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args)
-	{
-	  mp_arg_check_num(n_args, n_kw, 0, 0, false);
-	  return mb_sound_sensor_board_value(n_args,args);
-	}
-	
-	STATIC const mp_map_elem_t mb_sound_sensor_board_locals_dict_table[] =
-	{
-	  { MP_OBJ_NEW_QSTR(MP_QSTR_value), 			  (mp_obj_t)&mb_sound_sensor_board_value_obj },
-	};
-	
-	STATIC MP_DEFINE_CONST_DICT(mb_sound_sensor_board_locals_dict, mb_sound_sensor_board_locals_dict_table);
-	
-	const mp_obj_type_t mb_sound_sensor_board_type =
-	{
-	  { &mp_type_type },
-	  .name = MP_QSTR_sound_sensor_board,
-	  .print = mb_sound_sensor_board_print,
-	  .call = mb_sound_sensor_board_call,
-	  .make_new = mb_sound_sensor_board_make_new,
-	  .locals_dict = (mp_obj_t)&mb_sound_sensor_board_locals_dict,
-	};
+/******************************************************************************
+ DECLARE PRIVATE FUNCTIONS
+ ******************************************************************************/
+
+/******************************************************************************
+ DEFINE PUBLIC FUNCTIONS
+ ******************************************************************************/
+
+
+/******************************************************************************/
+
+STATIC mp_obj_t mb_sound_sensor_board_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
+{
+  // parse args
+  mp_map_t kw_args;
+  mp_map_init_fixed_table(&kw_args, n_kw, all_args + n_args);
+
+  mb_sound_sensor_board_config();
+  // setup the object
+  mb_sound_sensor_board_obj_t *self = &mb_sound_sensor_board_obj;
+  self->base.type = &mb_sound_sensor_board_type;
+  return self;
+}
+
+STATIC void mb_sound_sensor_board_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+{
+
+}
+
+void mb_sound_sensor_board_config()  
+{  
+adc2_config_width(ADC_WIDTH_12Bit);
+adc2_config_channel_atten(MB_SOUND_SENSOR_BOARD_CHANNEL,ADC_ATTEN_11db);
+
+}
+
+STATIC mp_obj_t mb_sound_sensor_board_value(mp_uint_t n_args, const mp_obj_t *args)
+{
+  float value=0;
+  value=(float)(adc2_get_voltage(MB_SOUND_SENSOR_BOARD_CHANNEL));
+
+  return mp_obj_new_float(value);
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mb_sound_sensor_board_value_obj,1, 1, mb_sound_sensor_board_value);
+//MP_DEFINE_CONST_FUN_OBJ_3(mb_potention_meter_board_value_obj, mb_potention_meter_board_value);
+
+
+STATIC mp_obj_t mb_sound_sensor_board_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args)
+{
+  mp_arg_check_num(n_args, n_kw, 0, 0, false);
+  return mb_sound_sensor_board_value(n_args,args);
+}
+
+STATIC const mp_map_elem_t mb_sound_sensor_board_locals_dict_table[] =
+{
+  { MP_OBJ_NEW_QSTR(MP_QSTR_value), 			  (mp_obj_t)&mb_sound_sensor_board_value_obj },
+};
+
+STATIC MP_DEFINE_CONST_DICT(mb_sound_sensor_board_locals_dict, mb_sound_sensor_board_locals_dict_table);
+
+const mp_obj_type_t mb_sound_sensor_board_type =
+{
+  { &mp_type_type },
+  .name = MP_QSTR_sound_sensor_board,
+  .print = mb_sound_sensor_board_print,
+  .call = mb_sound_sensor_board_call,
+  .make_new = mb_sound_sensor_board_make_new,
+  .locals_dict = (mp_obj_t)&mb_sound_sensor_board_locals_dict,
+};
 
 
 

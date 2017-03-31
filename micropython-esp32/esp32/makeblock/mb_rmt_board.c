@@ -71,22 +71,31 @@
 	static const char* NEC_TAG = "NEC";
 	
 	
-    #define RMT_RX_ACTIVE_LEVEL  0   /*!< If we connect with a IR receiver, the data is active low */
-    #define RMT_TX_CARRIER_EN    1   /*!< Enable carrier for IR transmitter test with IR led */
+    #define RMT_RX_ACTIVE_LEVEL  0  
+    #define RMT_TX_CARRIER_EN    1   
 	
-    #define RMT_RX_CHANNEL    RMT_CHANNEL_1     /*!< RMT channel for transmitter */
-    #define RMT_RX_GPIO_NUM  26     /*!< GPIO number for transmitter signal */
-    #define RMT_CLK_DIV      100    /*!< RMT counter clock divider */
+	
+    #define RMT_RX_CHANNEL    0     /*!< RMT channel for transmitter */
+    #define RMT_RX_GPIO_NUM   26     /*!< GPIO number for transmitter signal */
+    #define RMT_CLK_DIV       100    /*!< RMT counter clock divider */
     #define RMT_TICK_10_US    (80000000/RMT_CLK_DIV/100000)   /*!< RMT counter value for 10 us.(Source clock is APB clock) */
     	
     #define NEC_HEADER_HIGH_US    9000                         /*!< NEC protocol header: positive 9ms */
     #define NEC_HEADER_LOW_US     4500                         /*!< NEC protocol header: negative 4.5ms*/
-    #define NEC_BIT_ONE_HIGH_US    560                         /*!< NEC protocol data bit 1: positive 0.56ms */
+
+	#define NEC_BIT_ONE_HIGH_US    560                         /*!< NEC protocol data bit 1: positive 0.56ms */
     #define NEC_BIT_ONE_LOW_US    (2250-NEC_BIT_ONE_HIGH_US)   /*!< NEC protocol data bit 1: negative 1.69ms */
     #define NEC_BIT_ZERO_HIGH_US   560                         /*!< NEC protocol data bit 0: positive 0.56ms */
     #define NEC_BIT_ZERO_LOW_US   (1120-NEC_BIT_ZERO_HIGH_US)  /*!< NEC protocol data bit 0: negative 0.56ms */
+
+    //#define NEC_BIT_ONE_LOW_US     560                         /*!< NEC protocol data bit 1: positive 0.56ms */
+    //#define NEC_BIT_ONE_HIGH_US    (2250-NEC_BIT_ONE_LOW_US)   /*!< NEC protocol data bit 1: negative 1.69ms */
+    //#define NEC_BIT_ZERO_LOW_US    560                         /*!< NEC protocol data bit 0: positive 0.56ms */
+    //#define NEC_BIT_ZERO_HIGH_US   (1120-NEC_BIT_ZERO_LOW_US)  /*!< NEC protocol data bit 0: negative 0.56ms */
+
+	
     #define NEC_BIT_END            560                         /*!< NEC protocol end: positive 0.56ms */
-    #define NEC_BIT_MARGIN         20                          /*!< NEC parse margin time */
+    #define NEC_BIT_MARGIN         150//20                          /*!< NEC parse margin time */
     	
     #define NEC_ITEM_DURATION(d)  ((d & 0x7fff)*10/RMT_TICK_10_US)  /*!< Parse duration time from memory register value */
     #define NEC_DATA_ITEM_NUM   34  /*!< NEC code item number: header + 32bit data + end */
@@ -231,7 +240,7 @@
 		rmt_rx.rx_config.filter_ticks_thresh = 100;
 		rmt_rx.rx_config.idle_threshold = rmt_item32_tIMEOUT_US / 10 * (RMT_TICK_10_US);
 		rmt_config(&rmt_rx);
-		rmt_driver_install(rmt_rx.channel, 100, 0);
+		rmt_driver_install(rmt_rx.channel, 1000, 0);
 	}
 	
 	/**
@@ -253,8 +262,8 @@
 			//try to receive data from ringbuffer.
 			//RMT driver will push all the data it receives to its ringbuffer.
 			//We just need to parse the value and return the spaces of ringbuffer.
-			rmt_item32_t* item = (rmt_item32_t*) xRingbufferReceive(rb, &rx_size, 1000);
-            vTaskDelay(30 / portTICK_RATE_MS);
+			rmt_item32_t* item = (rmt_item32_t*) xRingbufferReceive(rb, &rx_size, 5000);
+            //vTaskDelay(30 / portTICK_RATE_MS);
 			if(item) {
 				uint16_t rmt_addr;
 				uint16_t rmt_cmd;
@@ -266,10 +275,10 @@
 						offset += res + 1;
 						ESP_LOGI(NEC_TAG, "RMT RCV --- addr: 0x%04x cmd: 0x%04x", rmt_addr, rmt_cmd);
 					} else {
-					    //ESP_LOGI(NEC_TAG, "error");
+					   // ESP_LOGI(NEC_TAG, "error");
 						break;
 					}
-				    vTaskDelay(30 / portTICK_RATE_MS);	
+				   // vTaskDelay(30 / portTICK_RATE_MS);	
 				}
 				//after parsing the data, return spaces to ringbuffer.
 				vRingbufferReturnItem(rb, (void*) item);
@@ -324,14 +333,14 @@
       float value=0;
       mb_rmt_board_obj_t *self = args[0];
 	  //self->butt = mp_obj_get_int(args[1]);
-	  
-      xTaskCreatePinnedToCore(rmt_nec_rx_task, "rmt_nec_rx_task", 2048, NULL, 2, NULL,0);
+	  xTaskCreate(rmt_nec_rx_task, "rmt_nec_rx_task", 2048, NULL, 2, NULL);
+      //xTaskCreatePinnedToCore(rmt_nec_rx_task, "rmt_nec_rx_task", 2048, NULL, 2, NULL,0);
       //rmt_nec_rx_task(NULL);
 	  return mp_obj_new_float(value);
 	}
 	
     //MP_DEFINE_CONST_FUN_OBJ_2(mb_rmt_board_value_obj, mb_rmt_board_value);
-	STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mb_rmt_board_value_obj,2, 2, mb_rmt_board_value);
+	STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mb_rmt_board_value_obj,1, 1, mb_rmt_board_value);
     //MP_DEFINE_CONST_FUN_OBJ_3(mb_rmt_board_value_obj, mb_rmt_board_value);
 	
 	

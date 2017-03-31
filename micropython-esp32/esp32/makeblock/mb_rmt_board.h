@@ -37,7 +37,7 @@
 #ifndef MB_RMT_BOARD_H_
 #define MB_RMT_BOARD_H_
 
-#define MB_RMT_BOARD_CHANNEL    RMT_CHANNEL_0
+#define MB_RMT_BOARD_CHANNEL    0
 #define MB_RMT_BOARD_GPIO       26
 
 extern void mb_rmt_board_config();  

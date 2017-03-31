@@ -43,131 +43,140 @@
 #include "driver/uart.h"
 #include "soc/uart_struct.h"
 #include "uart.h"
-	
+
+
 #include "mb_light_sensor.h"
 #include "mb_processcmd.h"
 	
-	/******************************************************************************
-	 MACRO DEFINITION
-	 ******************************************************************************/
-	
-	/******************************************************************************
-	 DECLARE CONSTANTS
-	 ******************************************************************************/
-	
-	/******************************************************************************
-	 DEFINE TYPES
-	 ******************************************************************************/
-	typedef struct
+/******************************************************************************
+ MACRO DEFINITION
+ ******************************************************************************/
+
+/******************************************************************************
+ DECLARE CONSTANTS
+ ******************************************************************************/
+
+/******************************************************************************
+ DEFINE TYPES
+ ******************************************************************************/
+typedef struct
+{
+  mp_obj_base_t base;
+  uint8_t port;
+} mb_light_sensor_obj_t;
+
+/******************************************************************************
+ DECLARE PRIVATE DATA
+ ******************************************************************************/
+STATIC mb_light_sensor_obj_t mb_light_sensor_obj = {.port = 0};
+
+/******************************************************************************
+ DECLARE PRIVATE FUNCTIONS
+ ******************************************************************************/
+
+/******************************************************************************
+ DEFINE PUBLIC FUNCTIONS
+ ******************************************************************************/
+
+
+/******************************************************************************/
+
+STATIC mp_obj_t mb_light_sensor_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
+{
+  // parse args
+  mp_map_t kw_args;
+  mp_map_init_fixed_table(&kw_args, n_kw, all_args + n_args);
+
+  communication_channel_init();        //fftust:???????
+
+  // setup the object
+  mb_light_sensor_obj_t *self = &mb_light_sensor_obj;
+  self->base.type = &mb_light_sensor_type;
+  return self;
+}
+
+STATIC void mb_light_sensor_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+{
+
+}
+
+STATIC mp_obj_t mb_light_sensor_value(mp_uint_t n_args, const mp_obj_t *args)
+{
+  TickType_t nowticks;
+
+  uint8_t length = 1+1+1+1;   // index + action + device + port
+  uint8_t index = 0;
+  float value = 0;
+  mb_light_sensor_obj_t *self = args[0];
+  self->port = mp_obj_get_int(args[1]);
+  rsp_be_received = false;
+  pure_command_mode = false;
+  free_the_read_buffer();
+
+  write_head();
+  write_serial(length);
+  write_serial(index);
+  write_serial(GET_CMD);
+  write_serial(LIGHT_SENSOR);
+  write_serial(self->port);
+  
+  nowticks=xTaskGetTickCount();
+  while(rsp_be_received == false)
+  {
+	if((xTaskGetTickCount()-nowticks)>100)   //fftust:wait 1s
 	{
-	  mp_obj_base_t base;
-	  uint8_t port;
-	} mb_light_sensor_obj_t;
-	
-	/******************************************************************************
-	 DECLARE PRIVATE DATA
-	 ******************************************************************************/
-	STATIC mb_light_sensor_obj_t mb_light_sensor_obj = {.port = 0};
-	
-	/******************************************************************************
-	 DECLARE PRIVATE FUNCTIONS
-	 ******************************************************************************/
-	
-	/******************************************************************************
-	 DEFINE PUBLIC FUNCTIONS
-	 ******************************************************************************/
-	
-	
-	/******************************************************************************/
-	
-	STATIC mp_obj_t mb_light_sensor_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
-	{
-	  // parse args
-	  mp_map_t kw_args;
-	  mp_map_init_fixed_table(&kw_args, n_kw, all_args + n_args);
-	
-	  communication_channel_init();        //fftust:???????
-	
-	  // setup the object
-	  mb_light_sensor_obj_t *self = &mb_light_sensor_obj;
-	  self->base.type = &mb_light_sensor_type;
-	  return self;
-	}
-	
-	STATIC void mb_light_sensor_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
-	{
-	
-	}
-	
-	STATIC mp_obj_t mb_light_sensor_value(mp_uint_t n_args, const mp_obj_t *args)
-	{
-	  uint8_t length = 1+1+1+1;   // index + action + device + port
-	  uint8_t index = 0;
-	  float value = 0;
-	  mb_light_sensor_obj_t *self = args[0];
-	  self->port = mp_obj_get_int(args[1]);
-	  rsp_be_received = false;
-	  pure_command_mode = false;
-	  free_the_read_buffer();
-	
-	  write_head();
-	  write_serial(length);
-	  write_serial(index);
-	  write_serial(GET_CMD);
-	  write_serial(LIGHT_SENSOR);
-	  write_serial(self->port);
-	  while(rsp_be_received == false)
-	  {
-		//需要加一个超时判断
-        //while((xx++)<0xffffff);
-		//break;
-	  }
-	  if((check_start_frame() == true) && (is_data_float() == true))
-	  {
-		value = read_float(4);
-	//	printf("value:%f\r\n",value);
-	  }
-	  else
-	  {
-	//	  printf("error frame!\r\n");
-	  }
-	  pure_command_mode = true;
-	  return mp_obj_new_float(value);
-	}
-	STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mb_light_sensor_value_obj, 2, 2, mb_light_sensor_value);
-	
-	void mb_light_sensor_value_cmd(uint8_t index, uint8_t port)
-	{
-	  uint8_t length = 1+1+1+1;   // index + action + device + port
-	  rsp_be_received = false;
-	  write_head();
-	  write_serial(length);
-	  write_serial(index);
-	  write_serial(GET_CMD);
-	  write_serial(LIGHT_SENSOR);
-	  write_serial(port);
-	}
-	
-	STATIC mp_obj_t mb_light_sensor_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args)
-	{
-	  mp_arg_check_num(n_args, n_kw, 0, 0, false);
-	  return mb_light_sensor_value(n_args,args);
-	}
-	
-	STATIC const mp_map_elem_t mb_light_sensor_locals_dict_table[] =
-	{
-	  { MP_OBJ_NEW_QSTR(MP_QSTR_value), 			  (mp_obj_t)&mb_light_sensor_value_obj },
-	};
-	
-	STATIC MP_DEFINE_CONST_DICT(mb_light_sensor_locals_dict, mb_light_sensor_locals_dict_table);
-	
-	const mp_obj_type_t mb_light_sensor_type =
-	{
-	  { &mp_type_type },
-	  .name = MP_QSTR_light_sensor,
-	  .print = mb_light_sensor_print,
-	  .call = mb_light_sensor_call,
-	  .make_new = mb_light_sensor_make_new,
-	  .locals_dict = (mp_obj_t)&mb_light_sensor_locals_dict,
-	};
+      ESP_LOGI(MB_TAG,"no respondse from the extention module,please check the connect");
+	  break;
+	}	
+  }
+  
+
+  if((check_start_frame() == true) && (is_data_float() == true))
+  {
+	value = read_float(4);
+//	printf("value:%f\r\n",value);
+  }
+  else
+  {
+//	  printf("error frame!\r\n");
+  }
+  pure_command_mode = true;
+  return mp_obj_new_float(value);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mb_light_sensor_value_obj, 2, 2, mb_light_sensor_value);
+
+void mb_light_sensor_value_cmd(uint8_t index, uint8_t port)
+{
+  uint8_t length = 1+1+1+1;   // index + action + device + port
+  rsp_be_received = false;
+  write_head();
+  write_serial(length);
+  write_serial(index);
+  write_serial(GET_CMD);
+  write_serial(LIGHT_SENSOR);
+  write_serial(port);
+}
+
+STATIC mp_obj_t mb_light_sensor_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args)
+{
+  mp_arg_check_num(n_args, n_kw, 0, 0, false);
+  return mb_light_sensor_value(n_args,args);
+}
+
+STATIC const mp_map_elem_t mb_light_sensor_locals_dict_table[] =
+{
+  { MP_OBJ_NEW_QSTR(MP_QSTR_value), 			  (mp_obj_t)&mb_light_sensor_value_obj },
+};
+
+STATIC MP_DEFINE_CONST_DICT(mb_light_sensor_locals_dict, mb_light_sensor_locals_dict_table);
+
+const mp_obj_type_t mb_light_sensor_type =
+{
+  { &mp_type_type },
+  .name = MP_QSTR_light_sensor,
+  .print = mb_light_sensor_print,
+  .call = mb_light_sensor_call,
+  .make_new = mb_light_sensor_make_new,
+  .locals_dict = (mp_obj_t)&mb_light_sensor_locals_dict,
+};
 

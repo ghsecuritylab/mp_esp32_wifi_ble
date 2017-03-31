@@ -35,6 +35,14 @@
 #ifndef MB_PROCESSCMD_H_
 #define MB_PROCESSCMD_H_
 
+/*************************/
+ #include "esp_log.h"
+ #define  MB_TAG "Makeblock: "
+/*************************/
+
+
+
+
 
 #define GET_CMD   1      //action
 #define RUN_CMD   2

@@ -101,6 +101,8 @@ STATIC void mb_linefollower_print(const mp_print_t *print, mp_obj_t self_in, mp_
 
 STATIC mp_obj_t mb_linefollower_value(mp_uint_t n_args, const mp_obj_t *args)
 {
+  TickType_t nowticks;
+  
   uint8_t length = 1+1+1+1;   // index + action + device + port
   uint8_t index = 0;
   float value = 0;
@@ -116,10 +118,17 @@ STATIC mp_obj_t mb_linefollower_value(mp_uint_t n_args, const mp_obj_t *args)
   write_serial(GET_CMD);
   write_serial(LINEFOLLOWER);
   write_serial(self->port);
+  
+  nowticks=xTaskGetTickCount();
   while(rsp_be_received == false)
   {
-    //需要加一个超时判断
+	if((xTaskGetTickCount()-nowticks)>100)   //fftust:wait 1s
+	{
+      ESP_LOGI(MB_TAG,"no respondse from the extention module,please check the connect");
+	  break;
+	}	
   }
+
   if((check_start_frame() == true) && (is_data_float() == true))
   {
     value = read_float(4);

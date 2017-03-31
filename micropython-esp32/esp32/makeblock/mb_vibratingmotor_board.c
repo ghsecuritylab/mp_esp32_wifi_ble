@@ -55,165 +55,165 @@
 #include "mb_vibratingmotor_board.h"
 #include "mb_processcmd.h"
 	
-	/******************************************************************************
-	 MACRO DEFINITION
-	 ******************************************************************************/
-	#define MB_POTENTIONMETER_BOARD_CHANNEL ADC2_CHANNEL_6 
-
-	#define MB_VIB_TASK_STACK_LEN       ((16*1024) / sizeof(StackType_t))
-	/******************************************************************************
-	 DECLARE CONSTANTS
-	 ******************************************************************************/
-	
-	/******************************************************************************
-	 DEFINE TYPES
-	 ******************************************************************************/
-	typedef struct
-	{
-	  mp_obj_base_t base;
-	  uint8_t frequence;  //0-100
-	  uint8_t runtime_s;  //0-255
-	} mb_vibratingmotor_board_obj_t;
-	
-	/******************************************************************************
-	 DECLARE PRIVATE DATA
-	 ******************************************************************************/
-	STATIC mb_vibratingmotor_board_obj_t mb_vibratingmotor_board_obj = {};
-	
-	/******************************************************************************
-	 DECLARE PRIVATE FUNCTIONS
-	 ******************************************************************************/
-	
-	/******************************************************************************
-	 DEFINE PUBLIC FUNCTIONS
-	 ******************************************************************************/
-	
-	
-	/******************************************************************************/
-	
-    STATIC mp_obj_t mb_vibratingmotor_board_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
-	{
-	  // parse args
-	  mp_map_t kw_args;
-	  mp_map_init_fixed_table(&kw_args, n_kw, all_args + n_args);
-	
-	  mb_vibratingmotor_board_config();
-	  // setup the object
-	  mb_vibratingmotor_board_obj_t *self = &mb_vibratingmotor_board_obj;
-	  self->base.type = &mb_vibratingmotor_board_type;
-	  return self;
-	}
-	
-	STATIC void mb_vibratingmotor_board_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
-	{
-	
-	}
-  
-    void mb_vibratingmotor_board_config()  
-	{  
-      gpio_config_t io_conf;
-      io_conf.intr_type = GPIO_PIN_INTR_DISABLE;  
-      io_conf.mode = GPIO_MODE_OUTPUT;
-      io_conf.pin_bit_mask = (1<<MB_VIBRATINGMOTOR_BOARD_IO);
-      io_conf.pull_down_en = 0;
-      io_conf.pull_up_en = 1;
-      gpio_config(&io_conf); 
-	}
-
-
-	STATIC void mb_vibratingmotor_TASK(void *pvParameters)
-	{
-      uint16_t tim;
-      if(mb_vibratingmotor_board_obj.frequence>=100)
-	  {
-        mb_vibratingmotor_board_obj.frequence=100;
-	  }
-	  if(mb_vibratingmotor_board_obj.runtime_s<0)
-	  {
-        mb_vibratingmotor_board_obj.runtime_s=0;
-	  }
-	  for(;;)
-	  {
-       	for(tim=0;tim< mb_vibratingmotor_board_obj.runtime_s* mb_vibratingmotor_board_obj.frequence/2;tim++)
-	    {
-		  gpio_set_level(MB_VIBRATINGMOTOR_BOARD_IO,MOTOR_RUN);
-	      vTaskDelay((1000/ mb_vibratingmotor_board_obj.frequence) / portTICK_RATE_MS);
-	      //vTaskDelay((100) / portTICK_RATE_MS);
-          gpio_set_level(MB_VIBRATINGMOTOR_BOARD_IO,MOTOR_STOP);
-		  vTaskDelay((1000/ mb_vibratingmotor_board_obj.frequence) / portTICK_RATE_MS);
-		  //vTaskDelay((100) / portTICK_RATE_MS);
-       	}
-		break;
-	  }
-	 	
-
-	  vTaskDelete( NULL );
-
-
-	}
-		
-	STATIC mp_obj_t mb_vibratingmotor_board_run(mp_uint_t n_args, const mp_obj_t *args)
-	{
+/******************************************************************************
+ MACRO DEFINITION
+ ******************************************************************************/
+ #define MB_VIBRATINGMOTOR_BOARD_IO    21
  
-	  //mb_vibratingmotor_board_obj_t *self=args[0];
-	  mb_vibratingmotor_board_obj.frequence = mp_obj_get_int(args[1]);
-	  mb_vibratingmotor_board_obj.runtime_s = mp_obj_get_int(args[2]);
-	  
-      xTaskCreatePinnedToCore(mb_vibratingmotor_TASK, "mb_vibratingmotor_TASK", MB_VIB_TASK_STACK_LEN , NULL, 1, NULL, 0);
-      return mp_const_none;
-	  #if 0
-	  uint16_t tim;
-	  mb_vibratingmotor_board_obj_t *self=args[0];
-	  self->frequence = mp_obj_get_int(args[1]);
-	  self->runtime_s = mp_obj_get_int(args[2]);
+ #define MB_VIB_TASK_STACK_LEN       ((16*1024) / sizeof(StackType_t))  //fftust:set it smaller
+/******************************************************************************
+ DECLARE CONSTANTS
+ ******************************************************************************/
 
-	  if(self->frequence<=0 || self->runtime_s<=0)
-	  	 return mp_const_none;
-      else
-      {
-        if(self->frequence>=100)
-		{
-          self->frequence=100;
-		}
-	  }
-	  			
-	  for(tim=0;tim<self->runtime_s*self->frequence/2;tim++)
-	  {
-	    gpio_set_level(MB_VIBRATINGMOTOR_BOARD_IO,MOTOR_RUN);
-	    vTaskDelay((1000/self->frequence) / portTICK_RATE_MS);
-        gpio_set_level(MB_VIBRATINGMOTOR_BOARD_IO,MOTOR_STOP);
-		vTaskDelay((1000/self->frequence) / portTICK_RATE_MS);
-	  }
-	  return mp_const_none;
-	  #endif
+/******************************************************************************
+ DEFINE TYPES
+ ******************************************************************************/
+typedef struct
+{
+  mp_obj_base_t base;
+  uint8_t frequence;  //0-100
+  uint8_t runtime_s;  //0-255
+} mb_vibratingmotor_board_obj_t;
+
+/******************************************************************************
+ DECLARE PRIVATE DATA
+ ******************************************************************************/
+STATIC mb_vibratingmotor_board_obj_t mb_vibratingmotor_board_obj = {};
+
+/******************************************************************************
+ DECLARE PRIVATE FUNCTIONS
+ ******************************************************************************/
+
+/******************************************************************************
+ DEFINE PUBLIC FUNCTIONS
+ ******************************************************************************/
+
+
+/******************************************************************************/
+
+STATIC mp_obj_t mb_vibratingmotor_board_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
+{
+  // parse args
+  mp_map_t kw_args;
+  mp_map_init_fixed_table(&kw_args, n_kw, all_args + n_args);
+
+  mb_vibratingmotor_board_config();   //fftust:GPIO config
+  // setup the object
+  mb_vibratingmotor_board_obj_t *self = &mb_vibratingmotor_board_obj;
+  self->base.type = &mb_vibratingmotor_board_type;
+  return self;
+}
+
+STATIC void mb_vibratingmotor_board_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+{
+
+}
+
+void mb_vibratingmotor_board_config()  
+{  
+  gpio_config_t io_conf;
+  io_conf.intr_type = GPIO_PIN_INTR_DISABLE;  
+  io_conf.mode = GPIO_MODE_OUTPUT;
+  io_conf.pin_bit_mask = (1<<MB_VIBRATINGMOTOR_BOARD_IO);
+  io_conf.pull_down_en = 0;
+  io_conf.pull_up_en = 1;
+  gpio_config(&io_conf); 
+}
+
+
+STATIC void mb_vibratingmotor_TASK(void *pvParameters)
+{
+  uint16_t tim;
+  if(mb_vibratingmotor_board_obj.frequence>=100)
+  {
+    mb_vibratingmotor_board_obj.frequence=100;
+  }
+  if(mb_vibratingmotor_board_obj.runtime_s<0)
+  {
+    mb_vibratingmotor_board_obj.runtime_s=0;
+  }
+  for(;;)
+  {
+   	for(tim=0;tim< mb_vibratingmotor_board_obj.runtime_s* mb_vibratingmotor_board_obj.frequence/2;tim++)
+    {
+	  gpio_set_level(MB_VIBRATINGMOTOR_BOARD_IO,MOTOR_RUN);
+      vTaskDelay((1000/ mb_vibratingmotor_board_obj.frequence) / portTICK_RATE_MS);
+      //vTaskDelay((100) / portTICK_RATE_MS);
+      gpio_set_level(MB_VIBRATINGMOTOR_BOARD_IO,MOTOR_STOP);
+	  vTaskDelay((1000/ mb_vibratingmotor_board_obj.frequence) / portTICK_RATE_MS);
+	  //vTaskDelay((100) / portTICK_RATE_MS);
+   	}
+	break;
+  }
+ 	
+
+  vTaskDelete( NULL );
+
+
+}
+	
+STATIC mp_obj_t mb_vibratingmotor_board_run(mp_uint_t n_args, const mp_obj_t *args)
+{
+
+  //mb_vibratingmotor_board_obj_t *self=args[0];
+  mb_vibratingmotor_board_obj.frequence = mp_obj_get_int(args[1]);
+  mb_vibratingmotor_board_obj.runtime_s = mp_obj_get_int(args[2]);
+  
+  xTaskCreatePinnedToCore(mb_vibratingmotor_TASK, "mb_vibratingmotor_TASK", MB_VIB_TASK_STACK_LEN , NULL, 1, NULL, 0);
+  return mp_const_none;
+  #if 0
+  uint16_t tim;
+  mb_vibratingmotor_board_obj_t *self=args[0];
+  self->frequence = mp_obj_get_int(args[1]);
+  self->runtime_s = mp_obj_get_int(args[2]);
+
+  if(self->frequence<=0 || self->runtime_s<=0)
+  	 return mp_const_none;
+  else
+  {
+    if(self->frequence>=100)
+	{
+      self->frequence=100;
 	}
-	
-	STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mb_vibratingmotor_board_run_obj,3, 3, mb_vibratingmotor_board_run);
-    //MP_DEFINE_CONST_FUN_OBJ_3(mb_potention_meter_board_value_obj, mb_potention_meter_board_value);
-	
-	
-	STATIC mp_obj_t mb_vibratingmotor_board_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args)
-	{
-	  mp_arg_check_num(n_args, n_kw, 0, 0, false);
-	  return mb_vibratingmotor_board_run(n_args,args);
-	}
-	
-	STATIC const mp_map_elem_t mb_vibratingmotor_board_locals_dict_table[] =
-	{
-	  { MP_OBJ_NEW_QSTR(MP_QSTR_run), 			  (mp_obj_t)&mb_vibratingmotor_board_run_obj },
-	};
-	
-	STATIC MP_DEFINE_CONST_DICT(mb_vibratingmotor_board_locals_dict, mb_vibratingmotor_board_locals_dict_table);
-	
-	const mp_obj_type_t mb_vibratingmotor_board_type =
-	{
-	  { &mp_type_type },
-	  .name = MP_QSTR_vibratingmotor_board,
-	  .print = mb_vibratingmotor_board_print,
-	  .call = mb_vibratingmotor_board_call,
-	  .make_new = mb_vibratingmotor_board_make_new,
-	  .locals_dict = (mp_obj_t)&mb_vibratingmotor_board_locals_dict,
-	};
+  }
+  			
+  for(tim=0;tim<self->runtime_s*self->frequence/2;tim++)
+  {
+    gpio_set_level(MB_VIBRATINGMOTOR_BOARD_IO,MOTOR_RUN);
+    vTaskDelay((1000/self->frequence) / portTICK_RATE_MS);
+    gpio_set_level(MB_VIBRATINGMOTOR_BOARD_IO,MOTOR_STOP);
+	vTaskDelay((1000/self->frequence) / portTICK_RATE_MS);
+  }
+  return mp_const_none;
+  #endif
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mb_vibratingmotor_board_run_obj,3, 3, mb_vibratingmotor_board_run);
+//MP_DEFINE_CONST_FUN_OBJ_3(mb_potention_meter_board_value_obj, mb_potention_meter_board_value);
+
+
+STATIC mp_obj_t mb_vibratingmotor_board_call(mp_obj_t self_in, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *args)
+{
+  mp_arg_check_num(n_args, n_kw, 0, 0, false);
+  return mb_vibratingmotor_board_run(n_args,args);
+}
+
+STATIC const mp_map_elem_t mb_vibratingmotor_board_locals_dict_table[] =
+{
+  { MP_OBJ_NEW_QSTR(MP_QSTR_run), 			  (mp_obj_t)&mb_vibratingmotor_board_run_obj },
+};
+
+STATIC MP_DEFINE_CONST_DICT(mb_vibratingmotor_board_locals_dict, mb_vibratingmotor_board_locals_dict_table);
+
+const mp_obj_type_t mb_vibratingmotor_board_type =
+{
+  { &mp_type_type },
+  .name = MP_QSTR_vibratingmotor_board,
+  .print = mb_vibratingmotor_board_print,
+  .call = mb_vibratingmotor_board_call,
+  .make_new = mb_vibratingmotor_board_make_new,
+  .locals_dict = (mp_obj_t)&mb_vibratingmotor_board_locals_dict,
+};
 
 
 

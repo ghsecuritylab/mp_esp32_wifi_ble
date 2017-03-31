@@ -122,32 +122,6 @@ STATIC mp_obj_t mb_dcmotor_run(mp_uint_t n_args, const mp_obj_t *args)
 //STATIC MP_DEFINE_CONST_FUN_OBJ_3(mb_dcmotor_run_obj, mb_dcmotor_run);
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mb_dcmotor_run_obj, 3, 3, mb_dcmotor_run);
 
-static mp_obj_t mb_mbot_move(mp_uint_t n_args,const mp_obj_t *args)
-{
-  uint8_t length = 1+1+1+1+2;   // index + action + device + port + speed
-  uint8_t index = 0;
-  mb_dcmotor_obj_t *self = args[0];
-  self->port = mp_obj_get_int(args[1]);
-  self->speed = mp_obj_get_int(args[2]);
-  write_head();
-  write_serial(length);
-  write_serial(index);
-  write_serial(RUN_CMD);
-  write_serial(MOTOR);
-  write_serial(self->port);
-  send_short(self->speed);
-  return mp_const_none;
-
-
-
-
-
-}
-
-
-
-
-
 void mb_dcmotor_run_cmd(uint8_t index, uint8_t port,int16_t speed)
 {
   uint8_t length = 1+1+1+1+2;   // index + action + device + port + speed
