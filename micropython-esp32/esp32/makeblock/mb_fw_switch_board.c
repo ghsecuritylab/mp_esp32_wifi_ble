@@ -35,8 +35,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-	
-	
+		
 #include "py/mpstate.h"
 #include "py/runtime.h"
 	
@@ -44,12 +43,9 @@
 #include "soc/uart_struct.h"
 #include "uart.h"
 #include "driver/adc.h"
-
-		
+	
 #include "mb_fw_switch_board.h"
 #include "mb_processcmd.h"
-
-
 
 
 /******************************************************************************

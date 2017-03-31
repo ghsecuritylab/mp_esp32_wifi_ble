@@ -87,13 +87,6 @@
     #define NEC_BIT_ONE_LOW_US    (2250-NEC_BIT_ONE_HIGH_US)   /*!< NEC protocol data bit 1: negative 1.69ms */
     #define NEC_BIT_ZERO_HIGH_US   560                         /*!< NEC protocol data bit 0: positive 0.56ms */
     #define NEC_BIT_ZERO_LOW_US   (1120-NEC_BIT_ZERO_HIGH_US)  /*!< NEC protocol data bit 0: negative 0.56ms */
-
-    //#define NEC_BIT_ONE_LOW_US     560                         /*!< NEC protocol data bit 1: positive 0.56ms */
-    //#define NEC_BIT_ONE_HIGH_US    (2250-NEC_BIT_ONE_LOW_US)   /*!< NEC protocol data bit 1: negative 1.69ms */
-    //#define NEC_BIT_ZERO_LOW_US    560                         /*!< NEC protocol data bit 0: positive 0.56ms */
-    //#define NEC_BIT_ZERO_HIGH_US   (1120-NEC_BIT_ZERO_LOW_US)  /*!< NEC protocol data bit 0: negative 0.56ms */
-
-	
     #define NEC_BIT_END            560                         /*!< NEC protocol end: positive 0.56ms */
     #define NEC_BIT_MARGIN         150//20                          /*!< NEC parse margin time */
     	

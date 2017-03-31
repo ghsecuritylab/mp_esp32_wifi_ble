@@ -28,6 +28,7 @@
  * <pre>
  * `<Author>`         `<Time>`        `<Version>`        `<Descr>`
  *  fftust            2017/03/20        1.0.0            build the new.
+ *  Mark Yan          2017/03/31        1.0.0            update for available version.
  * </pre>
  *
  */
@@ -59,112 +60,58 @@
 #include "esp32_mphal.h"
 #include "mb_sys.h"
 
-	/******************************************************************************
-	 MACRO DEFINITION
-	 ******************************************************************************/
-	
-	/******************************************************************************
-	 DECLARE CONSTANTS
-	 ******************************************************************************/
-	
-	/******************************************************************************
-	 DEFINE TYPES
-	 ******************************************************************************/
-	typedef struct
-	{
-	  mp_obj_base_t base;
-	  uint8_t port;
-	  uint8_t axis;
-	} mb_gyro_board_obj_t;
-	
-	/******************************************************************************
-	 DECLARE PRIVATE DATA
-	 ******************************************************************************/
-	STATIC mb_gyro_board_obj_t mb_gyro_board_obj = {.port = 0};
-	
-	/******************************************************************************
-	 DECLARE PRIVATE FUNCTIONS
-	 ******************************************************************************/
-	
-	/******************************************************************************
-	 DEFINE PUBLIC FUNCTIONS
-	 ******************************************************************************/
-	
-	
-	/******************************************************************************/
-	STATIC mp_obj_t mb_gyro_board_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
-	{
-	  // parse args
-	  mp_map_t kw_args;
-	  mp_map_init_fixed_table(&kw_args, n_kw, all_args + n_args);
-	
-	  // setup the object
-	  mb_gyro_board_obj_t *self = &mb_gyro_board_obj;
-	  self->base.type = &mb_gyro_board_type;
+/******************************************************************************
+ MACRO DEFINITION
+ ******************************************************************************/
 
-      i2c_master_init();  //fftust add
-      gyro_board_init();
-	  return self;
-	}
-	
-	STATIC void mb_gyro_board_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
-	{
-	
-	}
-/**
- * @brief test code to read esp-i2c-slave
- *        We need to fill the buffer of esp slave device, then master can read them out.
- *
- * _______________________________________________________________________________________
- * | start | slave_addr + rd_bit +ack | read n-1 bytes + ack | read 1 byte + nack | stop |
- * --------|--------------------------|----------------------|--------------------|------|
- *
- 
-esp_err_t i2c_master_read_slave(i2c_port_t i2c_num, uint8_t* data_rd, size_t size)
+/******************************************************************************
+ DECLARE CONSTANTS
+ ******************************************************************************/
+
+/******************************************************************************
+ DEFINE TYPES
+ ******************************************************************************/
+typedef struct
 {
-  if(size == 0)
-  {
-    return ESP_OK;
-  }
-  i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-  i2c_master_start(cmd);
-  i2c_master_write_byte(cmd, (GYRO_DEFAULT_ADDRESS<<1 ) | READ_BIT, ACK_CHECK_EN);
-  if(size > 1) 
-  {
-    i2c_master_read(cmd, data_rd, size - 1, ACK_VAL);
-  }
-  i2c_master_read_byte(cmd, data_rd + size - 1, NACK_VAL);
-  i2c_master_stop(cmd);
-  esp_err_t ret = i2c_master_cmd_begin(i2c_num, cmd, 1000 / portTICK_RATE_MS);
-  i2c_cmd_link_delete(cmd);
-  return ret;
-}
-*/
+  mp_obj_base_t base;
+  uint8_t port;
+  uint8_t axis;
+} mb_gyro_board_obj_t;
+
+/******************************************************************************
+ DECLARE PRIVATE DATA
+ ******************************************************************************/
+STATIC mb_gyro_board_obj_t mb_gyro_board_obj = {.port = 0};
+STATIC bool gyro_enabled = false;
+/******************************************************************************
+ DECLARE PRIVATE FUNCTIONS
+ ******************************************************************************/
+
+/******************************************************************************
+ DEFINE PUBLIC FUNCTIONS
+ ******************************************************************************/
 
 
-/**
- * @brief Test code to write esp-i2c-slave
- *        Master device write data to slave(both esp32),
- *        the data will be stored in slave buffer.
- *        We can read them out from slave buffer.
- *
- * ___________________________________________________________________
- * | start | slave_addr + wr_bit + ack | write n bytes + ack  | stop |
- * --------|---------------------------|----------------------|------|
- *
-
-esp_err_t i2c_master_write_slave(i2c_port_t i2c_num, uint8_t* data_wr, size_t size)
+/******************************************************************************/
+STATIC mp_obj_t mb_gyro_board_make_new(const mp_obj_type_t *type, mp_uint_t n_args, mp_uint_t n_kw, const mp_obj_t *all_args)
 {
-  i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-  i2c_master_start(cmd);
-  i2c_master_write_byte(cmd, (GYRO_DEFAULT_ADDRESS<< 1 ) | WRITE_BIT, ACK_CHECK_EN);
-  i2c_master_write(cmd, data_wr, size, ACK_CHECK_EN);
-  i2c_master_stop(cmd);
-  esp_err_t ret = i2c_master_cmd_begin(i2c_num, cmd, 1000 / portTICK_RATE_MS);
-  i2c_cmd_link_delete(cmd);
-  return ret;
+  // parse args
+  mp_map_t kw_args;
+  mp_map_init_fixed_table(&kw_args, n_kw, all_args + n_args);
+
+  // setup the object
+  mb_gyro_board_obj_t *self = &mb_gyro_board_obj;
+  self->base.type = &mb_gyro_board_type;
+
+  i2c_master_init();  //fftust add
+  gyro_board_init();
+  return self;
 }
-*/
+
+STATIC void mb_gyro_board_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind)
+{
+
+}
 
 /**
  * @brief i2c master initialization
@@ -233,8 +180,11 @@ void gyro_board_deviceCalibration()
   long xSum	= 0, ySum = 0, zSum = 0;
   for(x = 0; x < num; x++)
   {
-    return_value =i2c_read_gyro_data(I2C_NUM,0x43, i2cData, 6);	
-    //i2c_read_data(0x43, i2cData, 6);
+    return_value =i2c_read_gyro_data(I2C_NUM,0x43, i2cData, 6);
+	if(return_value == ESP_OK) 
+    {
+	  gyro_enabled = true;
+    }
 	xSum += ( (i2cData[0] << 8) | i2cData[1] );
     ySum += ( (i2cData[2] << 8) | i2cData[3] );
     zSum += ( (i2cData[4] << 8) | i2cData[5] );
@@ -262,8 +212,12 @@ void gyro_board_init()
   i2c_write_gyro_reg(0x6b, 0x00);//close the sleep mode
   i2c_write_gyro_reg(0x1a, 0x01);//configurate the digital low pass filter
   i2c_write_gyro_reg(0x1b, 0x08);//set the gyro scale to 500 deg/s
-
   gyro_board_deviceCalibration();
+}
+
+bool gyro_board_enabled(void)
+{
+  return gyro_enabled;
 }
 
 void gyro_board_update(void)
@@ -273,7 +227,10 @@ void gyro_board_update(void)
   double dt, filter_coefficient;
   /* read imu data */
   return_value =i2c_read_gyro_data(I2C_NUM,0x3b,i2cData, 14);
-
+  if(return_value != ESP_OK)
+  {
+  	return;
+  }
   double ax, ay, az;
   /* assemble 16 bit sensor data */
   accX = ( (i2cData[0] << 8) | i2cData[1] );
@@ -307,21 +264,10 @@ void gyro_board_update(void)
     gz = gz - 360;
   }
 
-  /*
-     complementary filter
-     set 0.5sec = tau = dt * A / (1 - A)
-     so A = tau / (tau + dt)
-  */
-  filter_coefficient = 0.5 / (0.5 + dt);
+  filter_coefficient = 0.98;
   gx = gx * filter_coefficient + ax * (1 - filter_coefficient);
   gy = gy * filter_coefficient + ay * (1 - filter_coefficient);   
 }
-
-
-
-
-
-
 
 STATIC mp_obj_t mb_gyro_board_value(mp_uint_t n_args, const mp_obj_t *args)
 {
