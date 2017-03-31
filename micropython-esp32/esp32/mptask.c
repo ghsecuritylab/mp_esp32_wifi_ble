@@ -24,9 +24,9 @@
 #include "makeblock/mb_makeblock.h"
 #include "soc/uart_struct.h"
 
-
-
-
+#include "ff.h"
+#include "diskio.h"
+#include "ffconf.h"
 
 /******************************************************************************
  DEFINE TYPES
@@ -56,12 +56,15 @@ union
  ******************************************************************************/
 char            test_data[1024]=" "; 
 char	        py_data[128] =" ";
+FATFS           sflash_fatfs;
+
 static uint8_t  prec;
 static uint8_t  dataLen;
 static int16_t  py_index;
-//static int16_t  py_data_index;
+static int16_t  py_data_index;
 static bool	    isStart;
-//static bool	    fileRevStart;
+static bool	    fileRevStart;
+
 
 //uint8_t *buffer_address_get()
 //{
@@ -327,13 +330,14 @@ void runMoudle(uint8_t device)
 {
   uint8_t cmd = readBuffer(6);
   uint8_t dataLen = readBuffer(2);
-  //FIL fp;
-  //UINT n;
+  FIL fp;
+  UINT n;
+
   switch(device)
   {
     case MICROPYTHON_ESP32:
       {
-      /*  if(cmd == 0x01)
+        if(cmd == 0x01)
         {
           printf("cmd is 1\r\n");
           py_data_index = 0;
@@ -356,16 +360,15 @@ void runMoudle(uint8_t device)
           printf("cmd is 4,length(%d)\r\n",py_data_index);
           if(fileRevStart == true)
           {
-            f_unlink("/flash/main.py");
-            f_open(&fp,"/flash/main.py",FA_WRITE | FA_CREATE_ALWAYS);
+            f_unlink(&sflash_fatfs,"/flash/main.py");
+            f_open(&sflash_fatfs,&fp,"/flash/main.py",FA_WRITE | FA_CREATE_ALWAYS);
             f_write(&fp,test_data,py_data_index,&n);
             f_close(&fp);
           }
           fileRevStart = false;
           pyexec_mode_kind = PYEXEC_MODE_FRIENDLY_REPL;
-        }*/
-        //else
-        if(cmd == 0x05)
+        }
+        else if(cmd == 0x05)
         {
           pyexec_mode_kind = PYEXEC_MODE_FRIENDLY_REPL;
 
