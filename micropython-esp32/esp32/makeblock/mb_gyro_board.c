@@ -74,14 +74,13 @@
 typedef struct
 {
   mp_obj_base_t base;
-  uint8_t port;
   uint8_t axis;
 } mb_gyro_board_obj_t;
 
 /******************************************************************************
  DECLARE PRIVATE DATA
  ******************************************************************************/
-STATIC mb_gyro_board_obj_t mb_gyro_board_obj = {.port = 0};
+STATIC mb_gyro_board_obj_t mb_gyro_board_obj = {.axis = 0};
 STATIC bool gyro_enabled = false;
 /******************************************************************************
  DECLARE PRIVATE FUNCTIONS
@@ -116,7 +115,7 @@ STATIC void mb_gyro_board_print(const mp_print_t *print, mp_obj_t self_in, mp_pr
 /**
  * @brief i2c master initialization
  */
-void i2c_master_init()
+void i2c_master_init(void)
 { 
   i2c_port_t i2c_master_port = I2C_NUM;
   i2c_config_t conf; 
@@ -135,8 +134,8 @@ uint8_t i2c_write_gyro_reg(uint8_t reg, uint8_t data)
 {
   i2c_cmd_handle_t cmd = i2c_cmd_link_create();
   i2c_master_start(cmd);
-  i2c_master_write_byte(cmd, (GYRO_DEFAULT_ADDRESS<<1) | WRITE_B, ACK_CHECK_E);
-  //i2c_master_write_byte(cmd, reg, ACK_CHECK_E);
+  i2c_master_write_byte(cmd, (GYRO_DEFAULT_ADDRESS << 1) | WRITE_B, ACK_CHECK_E);
+
   i2c_master_write(cmd, &reg, 1,ACK_CHECK_E);
   i2c_master_write(cmd, &data, 1,ACK_CHECK_E);
   i2c_master_stop(cmd);
@@ -155,10 +154,11 @@ uint8_t i2c_read_gyro_data(i2c_port_t i2c_num ,uint8_t start, uint8_t *buffer, u
 		
   i2c_cmd_handle_t cmd = i2c_cmd_link_create();
   i2c_master_start(cmd);
-  i2c_master_write_byte(cmd, (GYRO_DEFAULT_ADDRESS<<1 ) | WRITE_B, ACK_CHECK_E);
+  i2c_master_write_byte(cmd, (GYRO_DEFAULT_ADDRESS << 1 ) | WRITE_B, ACK_CHECK_E);
   i2c_master_write(cmd, &start,1, ACK_CHECK_E);
+
   i2c_master_start(cmd);
-  i2c_master_write_byte(cmd, (GYRO_DEFAULT_ADDRESS<<1 ) | READ_B, ACK_CHECK_E);
+  i2c_master_write_byte(cmd, (GYRO_DEFAULT_ADDRESS << 1 ) | READ_B, ACK_CHECK_E);
   if(size > 1) 
   {
     i2c_master_read(cmd, buffer, size - 1, ACK_V);
@@ -172,7 +172,7 @@ uint8_t i2c_read_gyro_data(i2c_port_t i2c_num ,uint8_t start, uint8_t *buffer, u
 
 
 }
-void gyro_board_deviceCalibration()
+void gyro_board_deviceCalibration(void)
 {
   int8_t return_value;
   uint16_t x = 0;
@@ -181,9 +181,9 @@ void gyro_board_deviceCalibration()
   for(x = 0; x < num; x++)
   {
     return_value =i2c_read_gyro_data(I2C_NUM,0x43, i2cData, 6);
-	if(return_value == ESP_OK) 
+    if(return_value != ESP_OK)
     {
-	  gyro_enabled = true;
+  	  return;
     }
 	xSum += ( (i2cData[0] << 8) | i2cData[1] );
     ySum += ( (i2cData[2] << 8) | i2cData[3] );
@@ -194,7 +194,7 @@ void gyro_board_deviceCalibration()
   gyrZoffs = zSum / num;
 }
 
-void gyro_board_init()
+void gyro_board_init(void)
 {
   gSensitivity = 65.5; //for 500 deg/s, check data sheet
   gx = 0;
@@ -212,7 +212,9 @@ void gyro_board_init()
   i2c_write_gyro_reg(0x6b, 0x00);//close the sleep mode
   i2c_write_gyro_reg(0x1a, 0x01);//configurate the digital low pass filter
   i2c_write_gyro_reg(0x1b, 0x08);//set the gyro scale to 500 deg/s
+  i2c_write_gyro_reg(0x19, 49);  //set the Sampling Rate   50Hz
   gyro_board_deviceCalibration();
+  gyro_enabled = true;
 }
 
 bool gyro_board_enabled(void)
@@ -225,28 +227,30 @@ void gyro_board_update(void)
   static unsigned long	last_time = 0;
   int8_t return_value;
   double dt, filter_coefficient;
+
+  dt = (double)(millis() - last_time) / 1000;
+  last_time = millis();
+
   /* read imu data */
   return_value =i2c_read_gyro_data(I2C_NUM,0x3b,i2cData, 14);
   if(return_value != ESP_OK)
   {
   	return;
   }
-  double ax, ay, az;
+  double ax, ay;
   /* assemble 16 bit sensor data */
   accX = ( (i2cData[0] << 8) | i2cData[1] );
   accY = ( (i2cData[2] << 8) | i2cData[3] );
   accZ = ( (i2cData[4] << 8) | i2cData[5] );  
-  gyrX = ( ( (i2cData[8] << 8) | i2cData[9] ) - gyrXoffs) / gSensitivity;
-  gyrY = ( ( (i2cData[10] << 8) | i2cData[11] ) - gyrYoffs) / gSensitivity;
-  gyrZ = ( ( (i2cData[12] << 8) | i2cData[13] ) - gyrZoffs) / gSensitivity;  
+  int temp = ( (i2cData[6] << 8) | i2cData[7] ); 
+  temperature = 36.53 + temp/340.0; 
+  gyrX = ( ( (i2cData[8] << 8) | i2cData[9] )) / gSensitivity;
+  gyrY = ( ( (i2cData[10] << 8) | i2cData[11] )) / gSensitivity;
+  gyrZ = ( ( (i2cData[12] << 8) | i2cData[13] )) / gSensitivity;  
   ax = atan2(accX, sqrt( pow(accY, 2) + pow(accZ, 2) ) ) * 180 / 3.1415926;
   ay = atan2(accY, sqrt( pow(accX, 2) + pow(accZ, 2) ) ) * 180 / 3.1415926;  
-
-  printf("Mark accX: %d,accY: %d,sys:%d\n",accX,accY,mp_hal_ticks_ms());
-
-  dt = (double)(millis() - last_time) / 1000;
-  last_time = millis();
-
+  //printf("Mark ax: %f,ay: %f,accX:%d\n",ax,ay,accX);
+  printf("accX:%d, accY:%d, accZ:%d, accX: %f, gyrY: %f,gyrZ:%f,temp:%f\n",accX,accY,accZ,gyrX,gyrY,gyrZ,temperature);
   if(accZ > 0)
   {
     gx = gx - gyrY * dt;
@@ -264,9 +268,10 @@ void gyro_board_update(void)
     gz = gz - 360;
   }
 
-  filter_coefficient = 0.98;
+  filter_coefficient = 0.96; //0.5/(0.5+dt);
   gx = gx * filter_coefficient + ax * (1 - filter_coefficient);
-  gy = gy * filter_coefficient + ay * (1 - filter_coefficient);   
+  gy = gy * filter_coefficient + ay * (1 - filter_coefficient);
+  printf("temperature:%f gx: %f,gy: %f,gz:%f,ax:%f,ay:%f\n",temperature,gx,gy,gz,ax,ay);
 }
 
 STATIC mp_obj_t mb_gyro_board_value(mp_uint_t n_args, const mp_obj_t *args)
@@ -274,8 +279,19 @@ STATIC mp_obj_t mb_gyro_board_value(mp_uint_t n_args, const mp_obj_t *args)
   float value = 0;  
   
   mb_gyro_board_obj_t *self = args[0];
-  gyro_board_update();
-  value = gx;
+  //self->axis = mp_obj_get_int(args[1]);
+  if(self->axis == 1)
+  {
+    value = gy;
+  }
+  else if(self->axis == 2)
+  {
+    value = gz;
+  }
+  else
+  {
+    value = gx;
+  }
   return mp_obj_new_float(value);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mb_gyro_board_value_obj, 1, 1, mb_gyro_board_value);

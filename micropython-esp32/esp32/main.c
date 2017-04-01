@@ -52,6 +52,7 @@
 
 #include "mptask.h"
 #include "makeblock/mb_makeblock.h"
+#include "makeblock/mb_sys.h"
 
 extern void process_serial_data(void *pvParameters); 
 
@@ -79,6 +80,22 @@ static char fresh_boot_py[] = "# boot.py -- run on boot-up\r\n"
                               "uart = UART(0, 115200)\r\n"
                               "os.dupterm(uart)\r\n";
 
+
+STATIC void sensor_updata(void *pvParameters)
+{
+  static unsigned long  lastTime = 0;
+  while(1)
+  {
+    if(gyro_board_enabled() == true)
+    {
+      if((millis() - lastTime) > 19)
+      {
+        lastTime = millis();
+        gyro_board_update();
+      }
+    }
+  }
+}
 
 
 STATIC void mptask_create_main_py (void) {
@@ -184,7 +201,7 @@ soft_reset:
             }
         }else{
             pyexec_pure_cmd_repl();
-        }	
+        }
     }
 
     mp_hal_stdout_tx_str("PYB: soft reboot\r\n");
@@ -197,8 +214,8 @@ void app_main(void) {
     nvs_flash_init();
     // TODO use xTaskCreateStatic (needs custom FreeRTOSConfig.h)
     xTaskCreatePinnedToCore(mp_task, "mp_task", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0);
-    //xTaskCreateStatic(mp_task, "mp_task", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, &mp_task_stack[0], &mp_task_tcb);
     xTaskCreatePinnedToCore(process_serial_data, "process_serial_data", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0);
+	xTaskCreatePinnedToCore(sensor_updata, "sensor_updata", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0);
 }
 
 void nlr_jump_fail(void *val) {

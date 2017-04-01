@@ -50,7 +50,7 @@ volatile uint8_t  _AD0;
 volatile uint8_t  _INT;
 double	gSensitivity; /* for 500 deg/s, check data sheet */
 double	gx, gy, gz;
-double	gyrX, gyrY, gyrZ;
+double	gyrX, gyrY, gyrZ, temperature;
 int16_t accX, accY, accZ;
 double	gyrXoffs, gyrYoffs, gyrZoffs;
 uint8_t i2cData[14];
@@ -74,9 +74,10 @@ uint8_t Device_Address;
 
 extern const mp_obj_type_t mb_gyro_board_type;
 extern void mb_gyro_board_value_cmd(uint8_t index, uint8_t port,uint8_t axis);
-extern void i2c_master_init();
-extern void gyro_board_init();
-
+extern void i2c_master_init(void);
+extern void gyro_board_init(void);
+extern bool gyro_board_enabled(void);
+extern void gyro_board_update(void);
 
 #endif //  MeGyro_H
 
