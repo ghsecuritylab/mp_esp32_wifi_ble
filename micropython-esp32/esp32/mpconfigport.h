@@ -29,6 +29,7 @@
 #define MICROPY_ENABLE_FINALISER            (1)
 #define MICROPY_STACK_CHECK                 (1)
 #define MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF (1)
+#define MICROPY_KBD_EXCEPTION               (1)
 #define MICROPY_HELPER_REPL                 (1)
 #define MICROPY_REPL_EMACS_KEYS             (1)
 #define MICROPY_REPL_AUTO_INDENT            (1)
@@ -49,6 +50,8 @@
 #define MICROPY_CAN_OVERRIDE_BUILTINS       (1)
 #define MICROPY_USE_INTERNAL_ERRNO          (1)
 #define MICROPY_USE_INTERNAL_PRINTF         (0) // ESP32 SDK requires its own printf
+#define MICROPY_ENABLE_SCHEDULER            (1)
+#define MICROPY_SCHEDULER_DEPTH             (8)
 #define MICROPY_VFS                         (1)
 #define MICROPY_VFS_FAT                     (1)
 
@@ -122,6 +125,9 @@
 #define MICROPY_PY_MACHINE_PULSE            (1)
 #define MICROPY_PY_MACHINE_I2C              (1)
 #define MICROPY_PY_MACHINE_SPI              (1)
+#define MICROPY_PY_MACHINE_SPI_MSB          (0)
+#define MICROPY_PY_MACHINE_SPI_LSB          (1)
+#define MICROPY_PY_MACHINE_SPI_MAKE_NEW     machine_hw_spi_make_new
 #define MICROPY_PY_MACHINE_SPI_MIN_DELAY    (0)
 #define MICROPY_PY_MACHINE_SPI_MAX_BAUDRATE (ets_get_cpu_frequency() * 1000000 / 200) // roughly
 #define MICROPY_PY_USSL                     (1)
@@ -190,7 +196,7 @@ extern const struct _mp_obj_module_t makeblock_module;
 
 #define MICROPY_PORT_ROOT_POINTERS \
     const char *readline_hist[8]; \
-    mp_obj_t mp_kbd_exception; \
+    mp_obj_t machine_pin_irq_handler[40]; \
 
 // type definitions for the specific machine
 
@@ -198,7 +204,12 @@ extern const struct _mp_obj_module_t makeblock_module;
 #define MICROPY_MAKE_POINTER_CALLABLE(p) ((void*)((mp_uint_t)(p)))
 #define MP_PLAT_PRINT_STRN(str, len) mp_hal_stdout_tx_strn_cooked(str, len)
 #define MP_SSIZE_MAX (0x7fffffff)
-#define MICROPY_EVENT_POLL_HOOK asm("waiti 0");
+#define MICROPY_EVENT_POLL_HOOK \
+    do { \
+        extern void mp_handle_pending(void); \
+        mp_handle_pending(); \
+        asm("waiti 0"); \
+    } while (0);
 
 #define UINT_FMT "%u"
 #define INT_FMT "%d"

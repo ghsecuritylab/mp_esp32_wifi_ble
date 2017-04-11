@@ -259,11 +259,6 @@ extern void vPortCleanUpTCB ( void *pxTCB );
 
 /* Test FreeRTOS timers (with timer task) and more. */
 /* Some files don't compile if this flag is disabled */
-#define CONFIG_TIMER_TASK_PRIORITY           10
-#define CONFIG_TIMER_QUEUE_LENGTH            10
-#define CONFIG_TIMER_TASK_STACK_DEPTH        2048
-
-
 #define configUSE_TIMERS                    1
 #define configTIMER_TASK_PRIORITY           CONFIG_TIMER_TASK_PRIORITY
 #define configTIMER_QUEUE_LENGTH            CONFIG_TIMER_QUEUE_LENGTH
