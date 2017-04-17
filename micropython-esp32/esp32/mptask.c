@@ -24,9 +24,11 @@
 #include "makeblock/mb_makeblock.h"
 #include "soc/uart_struct.h"
 
-#include "ff.h"
-#include "diskio.h"
-#include "ffconf.h"
+#include "lib/oofatfs/ff.h"
+#include "extmod/vfs_fat.h"
+
+//#include "diskio.h"
+//#include "ffconf.h"
 
 /******************************************************************************
  DEFINE TYPES

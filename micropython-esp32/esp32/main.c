@@ -35,9 +35,11 @@
 #include "nvs_flash.h"
 #include "esp_task.h"
 
-#include "ff.h"
-#include "diskio.h"
-#include "ffconf.h"
+#include "lib/oofatfs/ff.h"
+#include "extmod/vfs_fat.h"
+
+//#include "diskio.h"
+//#include "ffconf.h"
 
 #include "py/stackctrl.h"
 #include "py/nlr.h"
