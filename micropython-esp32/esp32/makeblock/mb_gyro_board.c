@@ -235,8 +235,7 @@ void gyro_board_update(void)
   return_value =i2c_read_gyro_data(I2C_NUM,0x3b,i2cData, 14);
   if(return_value != ESP_OK)
   {
-    printf("fftusterr");
-	return;
+  	return;
   }
   double ax, ay;
   /* assemble 16 bit sensor data */

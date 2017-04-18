@@ -80,7 +80,6 @@ STATIC uint8_t mp_task_heap[MP_TASK_HEAP_SIZE];
  DECLARE PRIVATE DATA
  ******************************************************************************/
 static fs_user_mount_t *mb_sflash_vfs_fat;
-static mp_vfs_mount_t sflash_vfs_mount;
 
 static char fresh_main_py[] = "# main.py -- put your code here!\r\n"
                               "from makeblock import dcmotor\r\n";

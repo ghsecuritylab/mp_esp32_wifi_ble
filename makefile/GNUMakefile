@@ -58,8 +58,6 @@ INC += -I$(ESPCOMP)/driver/include/driver
 INC += -I$(ESPCOMP)/nghttp/port/include
 INC += -I$(ESPCOMP)/nghttp/include
 INC += -I$(ESPCOMP)/esp32/include
-INC += -I$(ESPCOMP)/esp32/
-INC += -I$(ESPCOMP)/esp32/makeblock
 INC += -I$(ESPCOMP)/ethernet/include
 INC += -I$(ESPCOMP)/expat/include/expat
 INC += -I$(ESPCOMP)/expat/port/include
@@ -133,6 +131,7 @@ SRC_C = \
 	modsocket.c \
 	modesp.c \
 	espneopixel.c \
+	machine_hw_spi.c \
 	mptask.c \
 	makeblock/modmakeblock.c \
 	makeblock/mb_processcmd.c \
@@ -250,6 +249,7 @@ ESPIDF_DRIVER_O = $(addprefix $(ESPCOMP)/driver/,\
 	ledc.o \
 	gpio.o \
 	timer.o \
+	spi_master.o \
 	rtc_module.o \
 	i2c.o \
 	rmt.o \
@@ -308,6 +308,7 @@ $(BUILD)/$(ESPCOMP)/freertos/portasm.o: CFLAGS = $(CFLAGS_ASM)
 $(BUILD)/$(ESPCOMP)/freertos/xtensa_context.o: CFLAGS = $(CFLAGS_ASM)
 $(BUILD)/$(ESPCOMP)/freertos/xtensa_intr_asm.o: CFLAGS = $(CFLAGS_ASM)
 $(BUILD)/$(ESPCOMP)/freertos/xtensa_vectors.o: CFLAGS = $(CFLAGS_ASM)
+$(BUILD)/$(ESPCOMP)/freertos/%.o: CFLAGS += -I$(ESPCOMP)/freertos/include/freertos
 ESPIDF_FREERTOS_O = $(addprefix $(ESPCOMP)/freertos/,\
 	croutine.o \
 	event_groups.o \
