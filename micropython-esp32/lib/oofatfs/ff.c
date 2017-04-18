@@ -24,6 +24,9 @@
 
 #include <string.h>
 
+#include <stdio.h>
+
+
 #include "ff.h"         /* Declarations of FatFs API */
 #include "diskio.h"     /* Declarations of device I/O functions */
 
@@ -3348,8 +3351,7 @@ FRESULT f_read (
     FSIZE_t remain;
     UINT rcnt, cc, csect;
     BYTE *rbuff = (BYTE*)buff;
-
-
+	
     *br = 0;    /* Clear read byte counter */
     res = validate(&fp->obj, &fs);              /* Check validity of the file object */
     if (res != FR_OK || (res = (FRESULT)fp->err) != FR_OK) LEAVE_FF(fs, res);   /* Check validity */
@@ -3423,7 +3425,6 @@ FRESULT f_read (
         mem_cpy(rbuff, fp->buf + fp->fptr % SS(fs), rcnt);  /* Extract partial sector */
 #endif
     }
-
     LEAVE_FF(fs, FR_OK);
 }
 

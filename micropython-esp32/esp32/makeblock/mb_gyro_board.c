@@ -212,7 +212,7 @@ void gyro_board_init(void)
   i2c_write_gyro_reg(0x6b, 0x00);//close the sleep mode
   i2c_write_gyro_reg(0x1a, 0x01);//configurate the digital low pass filter
   i2c_write_gyro_reg(0x1b, 0x08);//set the gyro scale to 500 deg/s
-  i2c_write_gyro_reg(0x19, 49);  //set the Sampling Rate   50Hz
+  i2c_write_gyro_reg(0x19, 19);  //set the Sampling Rate   50Hz 49
   gyro_board_deviceCalibration();
   gyro_enabled = true;
 }
@@ -224,7 +224,7 @@ bool gyro_board_enabled(void)
 
 void gyro_board_update(void)
 {
-  static unsigned long	last_time = 0;
+  static volatile  uint32_t last_time = 0;
   int8_t return_value;
   double dt, filter_coefficient;
 
@@ -235,22 +235,24 @@ void gyro_board_update(void)
   return_value =i2c_read_gyro_data(I2C_NUM,0x3b,i2cData, 14);
   if(return_value != ESP_OK)
   {
-  	return;
+    printf("fftusterr");
+	return;
   }
   double ax, ay;
   /* assemble 16 bit sensor data */
   accX = ( (i2cData[0] << 8) | i2cData[1] );
   accY = ( (i2cData[2] << 8) | i2cData[3] );
   accZ = ( (i2cData[4] << 8) | i2cData[5] );  
-  int temp = ( (i2cData[6] << 8) | i2cData[7] ); 
+  int16_t temp = ( (i2cData[6] << 8) | i2cData[7] ); 
   temperature = 36.53 + temp/340.0; 
-  gyrX = ( ( (i2cData[8] << 8) | i2cData[9] )) / gSensitivity;
-  gyrY = ( ( (i2cData[10] << 8) | i2cData[11] )) / gSensitivity;
-  gyrZ = ( ( (i2cData[12] << 8) | i2cData[13] )) / gSensitivity;  
+  gyrX = (int16_t)( ( (i2cData[8] << 8) | i2cData[9] )) / gSensitivity;
+  gyrY = (int16_t)( ( (i2cData[10] << 8) | i2cData[11] )) / gSensitivity;
+  gyrZ = (int16_t)( ( (i2cData[12] << 8) | i2cData[13] )) / gSensitivity;  
+ 
   ax = atan2(accX, sqrt( pow(accY, 2) + pow(accZ, 2) ) ) * 180 / 3.1415926;
   ay = atan2(accY, sqrt( pow(accX, 2) + pow(accZ, 2) ) ) * 180 / 3.1415926;  
   //printf("Mark ax: %f,ay: %f,accX:%d\n",ax,ay,accX);
-  printf("accX:%d, accY:%d, accZ:%d, accX: %f, gyrY: %f,gyrZ:%f,temp:%f\n",accX,accY,accZ,gyrX,gyrY,gyrZ,temperature);
+  printf("accX:%d, accY:%d, accZ:%d, gyrX: %f, gyrY: %f,gyrZ:%f,temp:%d\n",accX,accY,accZ,gyrX,gyrY,gyrZ,temp);
   if(accZ > 0)
   {
     gx = gx - gyrY * dt;
@@ -279,7 +281,8 @@ STATIC mp_obj_t mb_gyro_board_value(mp_uint_t n_args, const mp_obj_t *args)
   float value = 0;  
   
   mb_gyro_board_obj_t *self = args[0];
-  //self->axis = mp_obj_get_int(args[1]);
+  self->axis = mp_obj_get_int(args[1]);
+  //gyro_board_update();
   if(self->axis == 1)
   {
     value = gy;
@@ -294,7 +297,8 @@ STATIC mp_obj_t mb_gyro_board_value(mp_uint_t n_args, const mp_obj_t *args)
   }
   return mp_obj_new_float(value);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mb_gyro_board_value_obj, 1, 1, mb_gyro_board_value);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mb_gyro_board_value_obj, 2, 2, mb_gyro_board_value);
+//STATIC MP_DEFINE_CONST_FUN_OBJ_2(mb_gyro_board_value_obj, mb_gyro_board_value);
 
 void mb_gyro_board_value_cmd(uint8_t index, uint8_t port,uint8_t axis)
 {

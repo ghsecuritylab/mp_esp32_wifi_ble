@@ -71,4 +71,7 @@
 #include "mb_vibratingmotor_board.h"
 #include "mb_sound_sensor_board.h"
 #include "mb_rmt_board.h"
+#include "mb_ftp_task.h"
+#include "mb_ftp/mb_ftp.h"
+#include "pybflash.h"
 #endif
