@@ -29,7 +29,7 @@ ESPCOMP = $(ESPIDF)/components
 ESPTOOL ?= $(ESPCOMP)/esptool_py/esptool/esptool.py
 
 # verify the ESP IDF version
-ESPIDF_SUPHASH := 47b8f78cb0e15fa43647788a808dac353167a485
+ESPIDF_SUPHASH := c06cc31d85cc700e1dbddbe527d4282c4bc5845a
 ESPIDF_CURHASH := $(shell git -C $(ESPIDF) show -s --pretty=format:'%H')
 ifneq ($(ESPIDF_CURHASH),$(ESPIDF_SUPHASH))
 $(info ** WARNING **)
@@ -49,6 +49,8 @@ INC += -I../lib/mp-readline
 INC += -I../lib/netutils
 INC += -I../lib/timeutils
 INC += -I../lib/oofatfs
+INC += -I../esp32
+INC += -I../esp32/makeblock
 INC += -I$(BUILD)
 INC += -I$(ESPCOMP)/bootloader_support/include
 INC += -I$(ESPCOMP)/driver/include
@@ -56,6 +58,8 @@ INC += -I$(ESPCOMP)/driver/include/driver
 INC += -I$(ESPCOMP)/nghttp/port/include
 INC += -I$(ESPCOMP)/nghttp/include
 INC += -I$(ESPCOMP)/esp32/include
+INC += -I$(ESPCOMP)/esp32/
+INC += -I$(ESPCOMP)/esp32/makeblock
 INC += -I$(ESPCOMP)/ethernet/include
 INC += -I$(ESPCOMP)/expat/include/expat
 INC += -I$(ESPCOMP)/expat/port/include
@@ -129,7 +133,6 @@ SRC_C = \
 	modsocket.c \
 	modesp.c \
 	espneopixel.c \
-	machine_hw_spi.c \
 	mptask.c \
 	makeblock/modmakeblock.c \
 	makeblock/mb_processcmd.c \
@@ -168,6 +171,12 @@ SRC_C = \
 	makeblock/mb_sound_sensor_board.c \
 	makeblock/mb_rmt_board.c \
 	makeblock/mb_sys.c \
+	makeblock/mb_ftp/mb_ftp.c \
+	makeblock/mb_ftp/fifo.c  \
+	makeblock/mb_ftp/socketfifo.c \
+	makeblock/mb_ftp_task.c \
+	makeblock/pybflash.c \
+	makeblock/mb_fatfs/drivers/sflash_diskio.c \
 	$(SRC_MOD)
 
 STM_SRC_C = $(addprefix stmhal/,\
@@ -241,7 +250,6 @@ ESPIDF_DRIVER_O = $(addprefix $(ESPCOMP)/driver/,\
 	ledc.o \
 	gpio.o \
 	timer.o \
-	spi_master.o \
 	rtc_module.o \
 	i2c.o \
 	rmt.o \
@@ -300,7 +308,6 @@ $(BUILD)/$(ESPCOMP)/freertos/portasm.o: CFLAGS = $(CFLAGS_ASM)
 $(BUILD)/$(ESPCOMP)/freertos/xtensa_context.o: CFLAGS = $(CFLAGS_ASM)
 $(BUILD)/$(ESPCOMP)/freertos/xtensa_intr_asm.o: CFLAGS = $(CFLAGS_ASM)
 $(BUILD)/$(ESPCOMP)/freertos/xtensa_vectors.o: CFLAGS = $(CFLAGS_ASM)
-$(BUILD)/$(ESPCOMP)/freertos/%.o: CFLAGS += -I$(ESPCOMP)/freertos/include/freertos
 ESPIDF_FREERTOS_O = $(addprefix $(ESPCOMP)/freertos/,\
 	croutine.o \
 	event_groups.o \
