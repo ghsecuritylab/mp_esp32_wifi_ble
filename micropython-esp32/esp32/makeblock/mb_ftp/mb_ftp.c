@@ -59,6 +59,11 @@
 #include "ff.h"
 #include "diskio.h"
 #include "ffconf.h"
+#include "makeblock/pybflash.h"
+#include "makeblock/mb_fatfs/drivers/sflash_diskio.h"
+#include "extmod/vfs_fat.h"
+#include "lib/timeutils/timeutils.h"
+
 
 
 #include "mb_ftp/mb_ftp.h"
@@ -83,10 +88,10 @@
 #define MB_FTP_DATA_CLIENTS_MAX                1
 
 #define MB_FTP_MAX_PARAM_SIZE                  129  //(MICROPY_ALLOC_PATH_MAX + 1)
-//#define MB_FTP_UNIX_TIME_20000101              946684800
-//#define MB_FTP_UNIX_TIME_20150101              1420070400
-//#define MB_FTP_UNIX_SECONDS_180_DAYS           15552000
-//#define MB_FTP_DATA_TIMEOUT_MS                 5000            // 5 seconds
+#define MB_FTP_UNIX_TIME_20000101              946684800
+#define MB_FTP_UNIX_TIME_20150101              1420070400
+#define MB_FTP_UNIX_SECONDS_180_DAYS           15552000
+#define MB_FTP_DATA_TIMEOUT_MS                 5000            // 5 seconds
 #define MB_FTP_SOCKETFIFO_ELEMENTS_MAX         4
 //#define MB_FTP_CYCLE_TIME_MS                  (SERVERS_CYCLE_TIME_MS * 2)
 
@@ -202,6 +207,8 @@ typedef enum {
 
 
 typedef char* mb_ftp_cmdchars_t;
+typedef char* mb_ftp_month_t;
+
 static mb_ftp_manager_t mb_ftp_manager;
 static char *mb_ftp_path;
 static char *mb_ftp_scratch_buffer;
@@ -212,6 +219,10 @@ static const mb_ftp_cmdchars_t mb_ftp_cmd_table[] = {"FEAT" ,  "SYST" ,  "CDUP" 
                                                      "LIST" ,  "RETR" ,  "STOR" ,  "DELE" ,
                                                      "RMD"  ,  "MKD"  ,  "RNFR" ,  "RNTO" ,
                                                      "NOOP" ,  "QUIT"  };
+static const mb_ftp_month_t mb_ftp_month[] = {  "Jan" ,  "Feb" ,  "Mar" ,  "Apr" ,
+                                          "May" ,  "Jun" ,  "Jul" ,  "Ago" ,
+                                          "Sep" ,  "Oct" ,  "Nov" ,  "Dec"  };
+
 
 static const char mb_ftp_user[]={"makeblock"};   
 static const char mb_ftp_pass[]={"12345678"};
@@ -220,6 +231,79 @@ static SocketFifoElement_t mb_ftp_fifoelements[MB_FTP_SOCKETFIFO_ELEMENTS_MAX];
 static FIFO_t mb_ftp_socketfifo;
 static FATFS mb_fatfs;
 
+/******************************************************************************
+ DEFINE VFS WRAPPER FUNCTIONS
+ ******************************************************************************/
+
+// These wrapper functions are used so that the FTP server can access the
+// mounted FATFS devices directly without going through the costly mp_vfs_XXX
+// functions.  The latter may raise exceptions and we would then need to wrap
+// all calls in an nlr handler.  The wrapper functions below assume that there
+// are only FATFS filesystems mounted.
+
+STATIC FATFS *lookup_path(const TCHAR **path) {
+    mp_vfs_mount_t *fs = mp_vfs_lookup_path(*path, path);
+    if (fs == MP_VFS_NONE || fs == MP_VFS_ROOT) {
+        return NULL;
+    }
+    // here we assume that the mounted device is FATFS
+    return &((fs_user_mount_t*)MP_OBJ_TO_PTR(fs->obj))->fatfs;
+}
+
+STATIC FRESULT f_open_helper(FIL *fp, const TCHAR *path, BYTE mode) {
+    FATFS *fs = lookup_path(&path);
+    if (fs == NULL) {
+        return FR_NO_PATH;
+    }
+    return f_open(fs, fp, path, mode);
+}
+
+STATIC FRESULT f_opendir_helper(FF_DIR *dp, const TCHAR *path) {
+    FATFS *fs = lookup_path(&path);
+    if (fs == NULL) {
+        return FR_NO_PATH;
+    }
+    return f_opendir(fs, dp, path);
+}
+
+STATIC FRESULT f_stat_helper(const TCHAR *path, FILINFO *fno) {
+    FATFS *fs = lookup_path(&path);
+    if (fs == NULL) {
+        return FR_NO_PATH;
+    }
+    return f_stat(fs, path, fno);
+}
+
+STATIC FRESULT f_mkdir_helper(const TCHAR *path) {
+    FATFS *fs = lookup_path(&path);
+    if (fs == NULL) {
+        return FR_NO_PATH;
+    }
+    return f_mkdir(fs, path);
+}
+
+STATIC FRESULT f_unlink_helper(const TCHAR *path) {
+    FATFS *fs = lookup_path(&path);
+    if (fs == NULL) {
+        return FR_NO_PATH;
+    }
+    return f_unlink(fs, path);
+}
+
+STATIC FRESULT f_rename_helper(const TCHAR *path_old, const TCHAR *path_new) {
+    FATFS *fs_old = lookup_path(&path_old);
+    if (fs_old == NULL) {
+        return FR_NO_PATH;
+    }
+    FATFS *fs_new = lookup_path(&path_new);
+    if (fs_new == NULL) {
+        return FR_NO_PATH;
+    }
+    if (fs_old != fs_new) {
+        return FR_NO_PATH;
+    }
+    return f_rename(fs_new, path_old, path_new);
+}
 
 /******************************************************************************/
 
@@ -235,6 +319,7 @@ STATIC mb_ftp_result_t mb_ftp_receive_data(int32_t sd, void *buff, int32_t Maxle
 STATIC void mb_ftp_cmd_process();
 STATIC void mb_ftp_close_socket(int32_t *sd);
 STATIC void mb_ftp_close_client_sockets (void);
+STATIC void mb_ftp_close_files (void);
 
 
 
@@ -264,7 +349,7 @@ void  mb_ftp_reset(void)
   mb_ftp_manager.state = MB_FTP_CONTROL_START;
   mb_ftp_manager.data_trans_state = MB_FTP_DATATRANS_DISCONNECTED;
   mb_ftp_manager.volcount = 0;
-  //SOCKETFIFO_Flush();
+  SOCKETFIFO_Flush();
 }
 
 STATIC void mb_ftp_enabled_check(void)
@@ -283,6 +368,9 @@ STATIC void mb_ftp_close_socket(int32_t *sd)
 	*sd = -1;
   }
 }
+
+
+
 STATIC mb_ftp_result_t mb_ftp_receive_data(int32_t sd, void *buff, int32_t Maxlen, int32_t *rxLen)
 {
   *rxLen = recv(sd, buff, Maxlen, 0);
@@ -387,22 +475,16 @@ STATIC void mb_ftp_send_from_fifo (void)
 
 STATIC void mb_ftp_send_reply(uint32_t status, char *message)
 {
-  //char *data;
-  //uint32_t datasize;
-  //int32_t _sd;
+
   SocketFifoElement_t fifoelement;
-  //data=pvPortMalloc(64);
   if (!message) 
   {
   	message = "";
   }
   snprintf((char *)mb_ftp_cmd_buffer, 4, "%u", status);
-  //strcat ((char *)mb_ftp_cmd_buffer, "makeblock");
   strcat ((char *)mb_ftp_cmd_buffer, " ");  
   strcat ((char *)mb_ftp_cmd_buffer, message);
   strcat ((char *)mb_ftp_cmd_buffer, "\r\n");
-  //_sd=mb_ftp_manager.cc_sd;
-  //datasize=strlen((char *)data);
   
   fifoelement.sd = &mb_ftp_manager.cc_sd;
   fifoelement.datasize = strlen((char *)mb_ftp_cmd_buffer);
@@ -429,10 +511,7 @@ STATIC void mb_ftp_send_reply(uint32_t status, char *message)
 	{
   		vPortFree(fifoelement.data);
   	}
-    //if(data)
-    //{
-     //memcpy(data, mb_ftp_cmd_buffer,datasize);
-    //  mb_ftp_send_data_non_blocking(_sd,data,datasize);
+
   }
 
 }
@@ -540,11 +619,21 @@ STATIC mb_ftp_result_t mb_ftp_wait_for_connection (int32_t l_sd, int32_t *n_sd, 
   return MB_FTP_RESULT_OK;
 }
 
+STATIC void mb_ftp_close_filesystem_on_error (void) 
+{
+    mb_ftp_close_files();
+    if (mb_ftp_manager.special_file)
+	{
+      //updater_finnish ();
+      mb_ftp_manager.special_file = false;
+    }
+}
+
 STATIC void mb_ftp_close_client_sockets (void)
 {
   mb_ftp_close_socket(&mb_ftp_manager.cc_sd);
   mb_ftp_close_socket(&mb_ftp_manager.cd_sd);
-  //ftp_close_filesystem_on_error ();
+  mb_ftp_close_filesystem_on_error ();
 }
 
 STATIC void mb_ftp_pop_param (char **str, char *param) 
@@ -565,6 +654,11 @@ void mb_stoupper (char *str)  //fftust:case-insensitive
     str++;
   }
 }
+
+
+
+
+
 
 STATIC mb_ftp_cmd_index_t mb_ftp_pop_command (char **str) 
 {
@@ -634,6 +728,26 @@ STATIC void mb_ftp_close_child (char *pwd)
   }
 }
 
+STATIC void mb_ftp_return_to_previous_path (char *pwd, char *dir) 
+{
+  uint newlen = strlen(pwd) - strlen(dir);
+  if ((newlen > 2) && (pwd[newlen - 1] == '/'))
+  {
+    pwd[newlen - 1] = '\0';
+  }
+  else 
+  {
+    if (newlen == 0)
+	{
+      strcpy (pwd, "/");
+    }
+	else
+	{
+      pwd[newlen] = '\0';
+    }
+  }
+}
+
 STATIC void mb_ftp_get_param_and_open_child (char **bufptr)
 {
     mb_ftp_pop_param (bufptr, mb_ftp_scratch_buffer);
@@ -641,56 +755,100 @@ STATIC void mb_ftp_get_param_and_open_child (char **bufptr)
     mb_ftp_manager.closechild = true;
 }
 
+
+STATIC bool mb_ftp_open_file (const char *path, int mode)
+{
+  FRESULT res = f_open_helper(&mb_ftp_manager.fp, path, mode);
+  if (res != FR_OK)
+  {
+    return false;
+  }
+  mb_ftp_manager.e_open = MB_FTP_FILE_OPEN;
+  return true;
+}
+
+STATIC  mb_ftp_result_t mb_ftp_read_file (char *filebuf, uint32_t desiredsize, uint32_t *actualsize) 
+{
+  mb_ftp_result_t result = MB_FTP_RESULT_CONTINUE;
+  FRESULT res = f_read(&mb_ftp_manager.fp,filebuf, desiredsize, (UINT *)actualsize);
+  if (res != FR_OK) 
+  {
+    mb_ftp_close_files();
+    result = MB_FTP_RESULT_FAILED;
+    *actualsize = 0;
+  }
+  else if (*actualsize < desiredsize) 
+  {
+    mb_ftp_close_files();
+    result = MB_FTP_RESULT_OK;
+  }
+  return result;
+}
+
+STATIC mb_ftp_result_t mb_ftp_write_file (char *filebuf, uint32_t size) 
+{
+  mb_ftp_result_t result = MB_FTP_RESULT_FAILED;
+  uint32_t actualsize;
+  FRESULT res = f_write(&mb_ftp_manager.fp, filebuf, size, (UINT *)&actualsize);
+  if ((actualsize == size) && (FR_OK == res))
+  {
+    result = MB_FTP_RESULT_OK;
+  }
+  else 
+  {
+    mb_ftp_close_files();
+  }
+  return result;
+}
+
 STATIC int mb_ftp_print_eplf_item (char *dest, uint32_t destsize, FILINFO *fno)
 {
+
   char *type = (fno->fattrib & AM_DIR) ? "d" : "-";
-   return snprintf(dest, destsize, "%srw-rw-r--   1 root  root %9u %s %2u %5u %s\r\n", type, (uint32_t)fno->fsize, "Jan",1,1980 + ((fno->fdate >> 9) & 0x7f), fno->fname);
-#if 0
-    char *type = (fno->fattrib & AM_DIR) ? "d" : "-";
-    uint32_t tseconds;
-    uint mindex = (((fno->fdate >> 5) & 0x0f) > 0) ? (((fno->fdate >> 5) & 0x0f) - 1) : 0;
-    uint day = ((fno->fdate & 0x1f) > 0) ? (fno->fdate & 0x1f) : 1;
-    uint fseconds = timeutils_seconds_since_epoch(1980 + ((fno->fdate >> 9) & 0x7f),
-                                                        (fno->fdate >> 5) & 0x0f,
-                                                        fno->fdate & 0x1f,
-                                                        (fno->ftime >> 11) & 0x1f,
-                                                        (fno->ftime >> 5) & 0x3f,
-                                                        2 * (fno->ftime & 0x1f));
-    tseconds = 3600; // pyb_rtc_get_seconds(); // FIXME
-    if (FTP_UNIX_SECONDS_180_DAYS < tseconds - fseconds) {
-        return snprintf(dest, destsize, "%srw-rw-r--   1 root  root %9u %s %2u %5u %s\r\n",
-                        type, (uint32_t)fno->fsize, ftp_month[mindex].month, day,
-                        1980 + ((fno->fdate >> 9) & 0x7f), fno->fname);
-    } else {
-        return snprintf(dest, destsize, "%srw-rw-r--   1 root  root %9u %s %2u %02u:%02u %s\r\n",
-                        type, (uint32_t)fno->fsize, ftp_month[mindex].month, day,
-                        (fno->ftime >> 11) & 0x1f, (fno->ftime >> 5) & 0x3f, fno->fname);
-    }
-  #endif
-  
+  uint32_t tseconds;
+  uint mindex = (((fno->fdate >> 5) & 0x0f) > 0) ? (((fno->fdate >> 5) & 0x0f) - 1) : 0;
+  uint day = ((fno->fdate & 0x1f) > 0) ? (fno->fdate & 0x1f) : 1;
+  uint fseconds = timeutils_seconds_since_2000(1980 + ((fno->fdate >> 9) & 0x7f),
+                                                      (fno->fdate >> 5) & 0x0f,
+                                                      fno->fdate & 0x1f,
+                                                      (fno->ftime >> 11) & 0x1f,
+                                                      (fno->ftime >> 5) & 0x3f,
+                                                      2 * (fno->ftime & 0x1f));
+  tseconds = 3600;//pyb_rtc_get_seconds();
+  if (MB_FTP_UNIX_SECONDS_180_DAYS < tseconds - fseconds)
+  {
+    return snprintf(dest, destsize, "%srw-rw-r--   1 root  root %9u %s %2u %5u %s\r\n",
+                    type, (uint32_t)fno->fsize, mb_ftp_month[mindex], day,
+                    1980 + ((fno->fdate >> 9) & 0x7f), fno->fname);
+  }
+  else
+  {
+    return snprintf(dest, destsize, "%srw-rw-r--   1 root  root %9u %s %2u %02u:%02u %s\r\n",
+                    type, (uint32_t)fno->fsize, mb_ftp_month[mindex], day,
+                    (fno->ftime >> 11) & 0x1f, (fno->ftime >> 5) & 0x3f, fno->fname);
+  }
   
 }
 
-STATIC int mb_ftp_print_eplf_drive (char *dest, uint32_t destsize, char *name)
-{
-  #if 0
-	timeutils_struct_time_t tm;
-    uint32_t tseconds;
-    char *type = "d";
+STATIC int mb_ftp_print_eplf_drive (char *dest, uint32_t destsize, const char *name)
+{ 
+  timeutils_struct_time_t tm;
+  uint32_t tseconds;
+  char *type = "d";
+  timeutils_seconds_since_2000_to_struct_time((MB_FTP_UNIX_TIME_20150101 - MB_FTP_UNIX_TIME_20000101), &tm);
+	
+  tseconds = 3600;//pyb_rtc_get_seconds();
+  if (MB_FTP_UNIX_SECONDS_180_DAYS < tseconds - (MB_FTP_UNIX_TIME_20150101 - MB_FTP_UNIX_TIME_20000101))
+  {
+    return snprintf(dest, destsize, "%srw-rw-r--   1 root  root %9u %s %2u %5u %s\r\n",
+ 				   type, 0, mb_ftp_month[(tm.tm_mon - 1)], tm.tm_mday, tm.tm_year, name);
+  }
+  else 
+  {
+    return snprintf(dest, destsize, "%srw-rw-r--   1 root  root %9u %s %2u %02u:%02u %s\r\n",
+						   type, 0, mb_ftp_month[(tm.tm_mon - 1)], tm.tm_mday, tm.tm_hour, tm.tm_min, name);
+  }
 
-    timeutils_seconds_since_epoch_to_struct_time((FTP_UNIX_TIME_20150101 - FTP_UNIX_TIME_20000101), &tm);
-
-    tseconds = 3600; // pyb_rtc_get_seconds(); // FIXME
-    if (FTP_UNIX_SECONDS_180_DAYS < tseconds - (FTP_UNIX_TIME_20150101 - FTP_UNIX_TIME_20000101)) {
-        return snprintf(dest, destsize, "%srw-rw-r--   1 root  root %9u %s %2u %5u %s\r\n",
-                        type, 0, ftp_month[(tm.tm_mon - 1)].month, tm.tm_mday, tm.tm_year, name);
-    } else {
-        return snprintf(dest, destsize, "%srw-rw-r--   1 root  root %9u %s %2u %02u:%02u %s\r\n",
-                        type, 0, ftp_month[(tm.tm_mon - 1)].month, tm.tm_mday, tm.tm_hour, tm.tm_min, name);
-    }
-  #endif
-  return snprintf(dest, destsize, "%srw-rw-r--   1 root  root %9u %s %2u %5u %s\r\n",
-                        "d", 0, "Jan", 1, 2017, name);
 }
 
 STATIC mb_ftp_result_t mb_ftp_list_dir (char *list, uint32_t maxlistsize, uint32_t *listsize) 
@@ -700,56 +858,60 @@ STATIC mb_ftp_result_t mb_ftp_list_dir (char *list, uint32_t maxlistsize, uint32
   FRESULT res;
   mb_ftp_result_t result = MB_FTP_RESULT_CONTINUE;
   FILINFO fno;
-  
-  // read up to 8 directory items
-  while (listcount < 8)
-  {
-    if(mb_ftp_manager.listroot) //root path
-	{
+  #if _USE_LFN
+  // read up to 2 directory items
+  while (listcount < 2) {
+  #else
+  // read up to 4 directory items
+  while (listcount < 4) {
+  #endif
+    if (mb_ftp_manager.listroot)
+    {
       // root directory "hack"
-      if (0 == mb_ftp_manager.volcount) 
-   	  {
-          next += mb_ftp_print_eplf_drive((list + next), (maxlistsize - next), "flash");
-      } 
-   	  else if (mb_ftp_manager.volcount <= 0/*MP_STATE_PORT(mount_obj_list).len*/) 
-   	  {
-        //os_fs_mount_t *mount_obj = ((os_fs_mount_t *)(MP_STATE_PORT(mount_obj_list).items[( mb_ftp_manager.volcount - 1)]));
-        next += mb_ftp_print_eplf_drive((list + next), (maxlistsize - next), "/flash"/*(char *)&mount_obj->path[1]*/);
-      } 
-   	  else 
-   	  {
-        if (!next) 
-   		{
+      mp_vfs_mount_t *vfs = MP_STATE_VM(vfs_mount_table);
+      int i = mb_ftp_manager.volcount;
+      while (vfs != NULL && i != 0)
+  	{
+        vfs = vfs->next;
+        i -= 1;
+      }
+      if (vfs == NULL)
+  	{
+        if (!next)
+  	  {
           // no volume found this time, we are done
           mb_ftp_manager.volcount = 0;
         }
         break;
+      } 
+  	else
+  	{
+        next += mb_ftp_print_eplf_drive((list + next), (maxlistsize - next), vfs->str + 1);
       }
       mb_ftp_manager.volcount++;
-    }
-	else
-	{
+    } 
+    else
+    {
       // a "normal" directory
       res = f_readdir(&mb_ftp_manager.dp, &fno);                                                       /* Read a directory item */
-      if (res != FR_OK || fno.fname[0] == 0) 
-	  {
+  		if (res != FR_OK || fno.fname[0] == 0) 
+  	{
         result = MB_FTP_RESULT_OK;
         break;                                                                                 /* Break on error or end of dp */
       }
       if (fno.fname[0] == '.' && fno.fname[1] == 0) continue;                                    /* Ignore . entry */
       if (fno.fname[0] == '.' && fno.fname[1] == '.' && fno.fname[2] == 0) continue;             /* Ignore .. entry */
-
+  
       // add the entry to the list
       next += mb_ftp_print_eplf_item((list + next), (maxlistsize - next), &fno);
-      }
-      listcount++;
+    }
+    listcount++;
   }
-  if (result == MB_FTP_RESULT_OK) 
+  if (result == MB_FTP_RESULT_OK)
   {
     mb_ftp_close_files();
   }
   *listsize = next;
-  
   return result;
 }
 
@@ -764,7 +926,7 @@ STATIC mb_ftp_result_t mb_ftp_open_dir_for_listing (const char *path)
   else
   {
   FRESULT res=FR_OK;
-  res = f_opendir(&mb_fatfs,&mb_ftp_manager.dp, path);                       /* Open the directory */
+  res = f_opendir_helper(&(mb_ftp_manager).dp, path);                       /* Open the directory */
   if (res != FR_OK)
   {
     return MB_FTP_RESULT_FAILED;
@@ -844,7 +1006,6 @@ void mb_ftp_run()
            mb_ftp_list_dir((char *)mb_ftp_manager.ftpBuffer, MB_FTP_BUFFER_SIZE, &listsize);
            if (listsize > 0)
 		   {
-             mb_ftp_send_reply(100, NULL);
 			 mb_ftp_send_data_to_fifo(listsize);
            } 
 		   else
@@ -857,8 +1018,79 @@ void mb_ftp_run()
 	 
 		 break;
     case MB_FTP_STE_CONTINUE_FILE_TX:
+         // read the next block from the file only if the previous one has been sent
+         if (SOCKETFIFO_IsEmpty())
+		 {
+           uint32_t readsize;
+           mb_ftp_result_t result;
+           mb_ftp_manager.ctimeout = 0;
+           result = mb_ftp_read_file ((char *)mb_ftp_manager.ftpBuffer, MB_FTP_BUFFER_SIZE, &readsize);
+           if (result == MB_FTP_RESULT_FAILED)
+		   {
+             mb_ftp_send_reply(451, NULL);
+             mb_ftp_manager.state = MB_FTP_STE_END_TRANSFER;
+           }
+           else
+		   {
+             if (readsize > 0)
+			 {
+               mb_ftp_send_data_to_fifo(readsize);
+             }
+             if (result == MB_FTP_RESULT_OK)
+			 {
+               mb_ftp_send_reply(226, NULL);
+               mb_ftp_manager.state = MB_FTP_STE_END_TRANSFER;
+             }
+           }
+         }	
 		 break;
     case MB_FTP_STE_CONTINUE_FILE_RX:
+		 if (SOCKETFIFO_IsEmpty())
+		 {
+		   int32_t len;
+		   mb_ftp_result_t result;
+		   if (MB_FTP_RESULT_OK == (result = mb_ftp_receive_data(mb_ftp_manager.cd_sd, mb_ftp_manager.ftpBuffer, MB_FTP_BUFFER_SIZE, &len)))
+		   {
+			 mb_ftp_manager.dtimeout = 0;
+			 mb_ftp_manager.ctimeout = 0;
+			 // its a software update
+			 if (mb_ftp_manager.special_file)
+			 {
+		       if (1/*updater_write(ftp_data.dBuffer, len)*/)
+			   {
+				 break;
+			   }
+		     }
+		     // user file being received
+			 else if (MB_FTP_RESULT_OK == mb_ftp_write_file ((char *)mb_ftp_manager.ftpBuffer, len)) 
+			 {
+			  break;
+			 }
+			 mb_ftp_send_reply(451, NULL);
+			 mb_ftp_manager.state = MB_FTP_STE_END_TRANSFER;
+		   }
+		   else if (result == MB_FTP_RESULT_CONTINUE)
+		   {
+			 if (mb_ftp_manager.dtimeout++ > 500) 
+			 {
+			   mb_ftp_close_files();
+			   mb_ftp_send_reply(426, NULL);
+			   mb_ftp_manager.state = MB_FTP_STE_END_TRANSFER;
+			 }
+		   }
+		   else
+		   {
+			 if (mb_ftp_manager.special_file) 
+			 {
+				mb_ftp_manager.special_file = false;
+				//updater_finnish();
+			 }
+			 mb_ftp_close_files();
+			 mb_ftp_send_reply(226, NULL);
+			 mb_ftp_manager.state = MB_FTP_STE_END_TRANSFER;
+		   }
+		 }
+
 		 break;
 	case MB_FTP_STE_END_TRANSFER:
 		 break;	 
@@ -878,7 +1110,6 @@ void mb_ftp_run()
 		   {
              mb_ftp_manager.dtimeout = 0;
              mb_ftp_manager.data_trans_state = MB_FTP_DATATRANS_CONNECTED;
-			 mb_ftp_send_reply(1000,"makeblock:the data channel have connected");//fftust:debug
            } 
 		   else if (mb_ftp_manager.dtimeout++ > 100000000/*FTP_DATA_TIMEOUT_MS / FTP_CYCLE_TIME_MS*/) 
 		   {
@@ -982,42 +1213,67 @@ STATIC void mb_ftp_cmd_process()
            }
            mb_ftp_send_reply(530, NULL);
 		   break;
-     case MB_FTP_CMD_CWD:
-            {
-              fres = FR_NO_PATH;
-              mb_ftp_pop_param (&bufptr, mb_ftp_scratch_buffer);
-              mb_ftp_open_child (mb_ftp_path, mb_ftp_scratch_buffer);
-              if ((mb_ftp_path[0] == '/' && mb_ftp_path[1] == '\0') || ((fres = f_opendir (&mb_fatfs,&mb_ftp_manager.dp, mb_ftp_path)) == FR_OK))
-			  {
-                if (fres == FR_OK)
-				{
-                  f_closedir(&mb_ftp_manager.dp);
-                }
-                mb_ftp_send_reply(250, NULL);
-                } 
-			    else
-			  	{
-                  mb_ftp_close_child (mb_ftp_path);
-                  mb_ftp_send_reply(550, NULL);
-                }
+      case MB_FTP_CMD_CWD:
+           fres = FR_NO_PATH;
+           mb_ftp_pop_param (&bufptr, mb_ftp_scratch_buffer);
+           mb_ftp_open_child (mb_ftp_path, mb_ftp_scratch_buffer);
+           if ((mb_ftp_path[0] == '/' && mb_ftp_path[1] == '\0') || ((fres = f_opendir_helper (&mb_ftp_manager.dp, mb_ftp_path)) == FR_OK))
+   		   {
+   			if (fres == FR_OK)
+   			{
+              f_closedir(&mb_ftp_manager.dp);	  
             }
-            break;
+             mb_ftp_send_reply(250, NULL);
+           } 
+   		   else
+   		   {
+             mb_ftp_close_child (mb_ftp_path);
+             mb_ftp_send_reply(550, NULL);
+           }
+           break;
      case MB_FTP_CMD_LIST:
 	 	  if (mb_ftp_open_dir_for_listing(mb_ftp_path) == MB_FTP_RESULT_CONTINUE)
 		  {
 			mb_ftp_manager.state = MB_FTP_STE_CONTINUE_LISTING;
-            mb_ftp_send_reply(150, NULL);
+            printf("makeblock :MB_FTP_STE_CONTINUE_LISTING\n");
+			mb_ftp_send_reply(150, NULL);
           } 
 		  else
 		  {
             mb_ftp_send_reply(550, NULL);
           }
           break;  
-
+	 case MB_FTP_CMD_RETR:
+		  mb_ftp_get_param_and_open_child (&bufptr);
+		  if (mb_ftp_open_file (mb_ftp_path, FA_READ)) 
+		  {
+		    mb_ftp_manager.state = MB_FTP_STE_CONTINUE_FILE_TX;
+		    mb_ftp_send_reply(150, NULL);
+		  }
+		  else
+		  {
+	        mb_ftp_manager.state = MB_FTP_STE_END_TRANSFER;
+		    mb_ftp_send_reply(550, NULL);
+		  }
+		  break;
+     case MB_FTP_CMD_STOR:
+     	  mb_ftp_get_param_and_open_child (&bufptr);
+          if (mb_ftp_open_file (mb_ftp_path, FA_WRITE | FA_CREATE_ALWAYS))
+          {
+        	mb_ftp_manager.state = MB_FTP_STE_CONTINUE_FILE_RX;
+        	mb_ftp_send_reply(150, NULL);
+          }
+          else
+          {
+            mb_ftp_manager.state = MB_FTP_STE_END_TRANSFER;
+        	mb_ftp_send_reply(550, NULL);
+          }
+     	  break;
+  
      case MB_FTP_CMD_DELE:
      case MB_FTP_CMD_RMD:
           mb_ftp_get_param_and_open_child (&bufptr);
-          if (FR_OK == f_unlink(&mb_fatfs,mb_ftp_path))
+          if (FR_OK == f_unlink_helper(mb_ftp_path))
  		  {
             mb_ftp_send_reply(250, NULL);
           } 
@@ -1028,7 +1284,7 @@ STATIC void mb_ftp_cmd_process()
           break;
      case MB_FTP_CMD_MKD:
           mb_ftp_get_param_and_open_child (&bufptr);
-          if (FR_OK == f_mkdir(&mb_fatfs,mb_ftp_path))
+          if (FR_OK == f_mkdir_helper(mb_ftp_path))
    		  {
             mb_ftp_send_reply(250, NULL);
           } 
@@ -1039,7 +1295,7 @@ STATIC void mb_ftp_cmd_process()
           break;
      case MB_FTP_CMD_RNFR:
           mb_ftp_get_param_and_open_child (&bufptr);
-          if (FR_OK == f_stat (&mb_fatfs,mb_ftp_path, &fno)) 
+          if (FR_OK == f_stat_helper(mb_ftp_path, &fno)) 
 		  {
             mb_ftp_send_reply(350, NULL);
             // save the current path
@@ -1053,7 +1309,7 @@ STATIC void mb_ftp_cmd_process()
      case MB_FTP_CMD_RNTO:
           mb_ftp_get_param_and_open_child (&bufptr);
           // old path was saved in the data buffer
-          if (FR_OK == (fres = f_rename (&mb_fatfs,(char *)mb_ftp_manager.ftpBuffer, mb_ftp_path)))
+          if (FR_OK == (fres = f_rename_helper((char *)mb_ftp_manager.ftpBuffer, mb_ftp_path)))
 		  {
             mb_ftp_send_reply(250, NULL);
           } 
@@ -1062,12 +1318,47 @@ STATIC void mb_ftp_cmd_process()
             mb_ftp_send_reply(550, NULL);
           }
           break;
+     case MB_FTP_CMD_SIZE:
+          {
+            mb_ftp_get_param_and_open_child (&bufptr);
+            if (FR_OK == f_stat_helper(mb_ftp_path, &fno)) 
+			{
+              // send the size
+              snprintf((char *)mb_ftp_manager.ftpBuffer, MB_FTP_BUFFER_SIZE, "%u", (uint32_t)fno.fsize);
+              mb_ftp_send_reply(213, (char *)mb_ftp_manager.ftpBuffer);
+            }
+            else
+			{
+              mb_ftp_send_reply(550, NULL);
+            }
+          }
+          break;
+      case MB_FTP_CMD_MDTM:
+           mb_ftp_get_param_and_open_child (&bufptr);
+           if (FR_OK == f_stat_helper(mb_ftp_path, &fno)) 
+ 		   {
+             // send the last modified time
+             snprintf((char *)mb_ftp_manager.ftpBuffer, MB_FTP_BUFFER_SIZE, "%u%02u%02u%02u%02u%02u",
+                       1980 + ((fno.fdate >> 9) & 0x7f), (fno.fdate >> 5) & 0x0f,
+                       fno.fdate & 0x1f, (fno.ftime >> 11) & 0x1f,
+                       (fno.ftime >> 5) & 0x3f, 2 * (fno.ftime & 0x1f));
+             mb_ftp_send_reply(213, (char *)mb_ftp_manager.ftpBuffer);
+           }
+           else
+ 		   {
+             mb_ftp_send_reply(550, NULL);
+           }
+           break;		  
+      case MB_FTP_CMD_CDUP:
+           mb_ftp_close_child(mb_ftp_path);
+           mb_ftp_send_reply(250, NULL);
+            break;
       case MB_FTP_CMD_PWD:
-	  	   mb_ftp_send_reply(257, mb_ftp_path);
-           break;
+
       case MB_FTP_CMD_XPWD:
            mb_ftp_send_reply(257, mb_ftp_path);
            break;
+		   
 	  case MB_FTP_CMD_TYPE:
            mb_ftp_send_reply(200, NULL);
            break;   
@@ -1086,11 +1377,11 @@ STATIC void mb_ftp_cmd_process()
 	  	   mb_ftp_send_reply(502,"the command is unknow");
 	  	   break;
 
+    }
 
-
-
-
-
+	if (mb_ftp_manager.closechild)
+	{
+      mb_ftp_return_to_previous_path(mb_ftp_path, mb_ftp_scratch_buffer);
     }
     
   }
@@ -1098,7 +1389,7 @@ STATIC void mb_ftp_cmd_process()
   {
   	if (mb_ftp_manager.ctimeout++ > 100000000/*(servers_get_timeout() / FTP_CYCLE_TIME_MS)*/) 
 	{
-	  mb_ftp_send_reply(221, NULL); //fftust:debug
+	  //mb_ftp_send_reply(221, NULL); //fftust:debug
 	  mb_ftp_manager.ctimeout=0;
   	}
   } 

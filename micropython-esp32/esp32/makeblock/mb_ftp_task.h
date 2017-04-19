@@ -49,7 +49,7 @@
 
 #define FTP_TASK_USER_PASS_LEN_MAX               32
 
-#define FTP_TASK_CYCLE_TIME_MS                   2
+#define FTP_TASK_CYCLE_TIME_MS                   20
 
 #define FTP_TASK_DEF_USER                        "makeblock"
 #define FTP_TASK_DEF_PASS                        "12345678"
