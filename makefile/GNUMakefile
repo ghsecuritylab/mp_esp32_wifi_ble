@@ -150,7 +150,7 @@ MB_SRC_WIFI_C = $(addprefix makeblock/src/wifi/,\
 	mb_ftp/drive/socketfifo.c \
 	mb_wifi_test.c \
 	)
-MB_SRC_EXTMOD_C = $(addprefix makeblock/src/sys/,\
+MB_SRC_SYS_C = $(addprefix makeblock/src/sys/,\
     mb_fatfs/drivers/sflash_diskio.c \
     mb_fatfs/pybflash.c \
     mb_sys.c \
@@ -252,12 +252,12 @@ OBJ_MP += $(addprefix $(BUILD)/, $(LIB_SRC_C:.c=.o))
 OBJ_MP += $(addprefix $(BUILD)/, $(DRIVERS_SRC_C:.c=.o))
 OBJ_MP += $(addprefix $(BUILD)/, $(MB_SRC_HARDWARE_ONBOARD_C:.c=.o))
 OBJ_MP += $(addprefix $(BUILD)/, $(MB_SRC_HARDWARE_MBOT_C:.c=.o))
-OBJ_MP += $(addprefix $(BUILD)/, $(MB_SRC_EXTMOD_C:.c=.o))
+OBJ_MP += $(addprefix $(BUILD)/, $(MB_SRC_SYS_C:.c=.o))
 OBJ_MP += $(addprefix $(BUILD)/, $(MB_SRC_WIFI_C:.c=.o))
 
 # List of sources for qstr extraction
 SRC_QSTR += $(SRC_C) $(STM_SRC_C) $(ESP8266_SRC_C) $(EXTMOD_SRC_C) $(DRIVERS_SRC_C) \
-            $(MB_SRC_HARDWARE_ONBOARD_C) $(MB_SRC_SENSOR_MBOT_C) $(MB_SRC_EXTMOD_C) $(MB_SRC_WIFI_C)
+            $(MB_SRC_HARDWARE_ONBOARD_C) $(MB_SRC_HARDWARE_MBOT_C) $(MB_SRC_SYS_C) $(MB_SRC_WIFI_C)
 # Append any auto-generated sources that are needed by sources listed in SRC_QSTR
 SRC_QSTR_AUTO_DEPS +=
 
