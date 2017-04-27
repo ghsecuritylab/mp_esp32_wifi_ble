@@ -43,13 +43,7 @@
 #include "py/stream.h"
 #include "py/mphal.h"
 #include "uart.h"
-//#include "machuart.h"
-//#include "mb_linefollower.h"
-//#include "mb_dcmotor.h"
-//#include "mb_ultrasonic_sensor.h"
-//#include "mb_light_sensor.h"
-//#include "mb_RGBLed.h"
-//#include "mb_buzzer.h"
+
 #include "mb_makeblock.h"
 /// \module makeblock - functions related to the makeblock
 ///
@@ -107,6 +101,7 @@ STATIC const mp_map_elem_t makeblock_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_vibratingmotor_board),      (mp_obj_t)&mb_vibratingmotor_board_type }, 
     { MP_OBJ_NEW_QSTR(MP_QSTR_sound_sensor_board),        (mp_obj_t)&mb_sound_sensor_board_type }, 
     { MP_OBJ_NEW_QSTR(MP_QSTR_rmt_board),                 (mp_obj_t)&mb_rmt_board_type }, 
+    { MP_OBJ_NEW_QSTR(MP_QSTR_wifi_test),                 (mp_obj_t)&mb_wifi_test_type },
 };
 
 STATIC MP_DEFINE_CONST_DICT(makeblock_module_globals, makeblock_module_globals_table);

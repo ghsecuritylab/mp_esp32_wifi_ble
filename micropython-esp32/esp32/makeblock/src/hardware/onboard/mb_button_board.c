@@ -96,7 +96,7 @@ STATIC mp_obj_t mb_button_board_make_new(const mp_obj_type_t *type, mp_uint_t n_
 
   mb_button_board_config();
 
-  printf("MAKEBLOCK API:call function-- value(1 or 2)-- to get the status of button1 or 2\n"); 
+  //printf("MAKEBLOCK API:call function-- value(1 or 2)-- to get the status of button1 or 2\n"); 
   // setup the object
   mb_button_board_obj_t *self = &mb_button_board_obj;
   self->base.type = &mb_button_board_type;
@@ -134,7 +134,6 @@ STATIC mp_obj_t mb_button_board_value(mp_uint_t n_args, const mp_obj_t *args)
   float value=0;
   mb_button_board_obj_t *self = args[0];
   self->butt = mp_obj_get_int(args[1]);
-
   if(self->butt==1)
   {
     value= (float)(gpio_get_level(BUTTON1_IO));
@@ -145,7 +144,7 @@ STATIC mp_obj_t mb_button_board_value(mp_uint_t n_args, const mp_obj_t *args)
   }	  
   else
   { 
-    printf("PARA ERROR: please input the para between 1 to 2\n");
+    //printf("PARA ERROR: please input the para between 1 to 2\n");
     
   }
   
@@ -153,7 +152,7 @@ STATIC mp_obj_t mb_button_board_value(mp_uint_t n_args, const mp_obj_t *args)
 }
 
 //MP_DEFINE_CONST_FUN_OBJ_2(mb_button_board_value_obj, mb_button_board_value);
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mb_button_board_value_obj,2, 2, mb_button_board_value);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mb_button_board_value_obj,2, 4, mb_button_board_value);
 //MP_DEFINE_CONST_FUN_OBJ_3(mb_button_board_value_obj, mb_button_board_value);
 
 

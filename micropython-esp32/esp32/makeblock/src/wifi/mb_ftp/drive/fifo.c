@@ -27,7 +27,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "mb_ftp/fifo.h"
+#include "mb_ftp/drive/fifo.h"
 
 
 /******************************************************************************

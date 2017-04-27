@@ -19,7 +19,7 @@
  * distributed. See http://www.gnu.org/copyleft/gpl.html
  *
  * \par Description
- * This file is a drive flame_sensor module.
+ * This file is a drive ftp module.
  *
  * \par Method List:
  *
@@ -59,16 +59,16 @@
 #include "ff.h"
 #include "diskio.h"
 #include "ffconf.h"
-#include "makeblock/pybflash.h"
-#include "makeblock/mb_fatfs/drivers/sflash_diskio.h"
+#include "mb_fatfs/pybflash.h"
+#include "mb_fatfs/drivers/sflash_diskio.h"
 #include "extmod/vfs_fat.h"
 #include "lib/timeutils/timeutils.h"
 
 
 
 #include "mb_ftp/mb_ftp.h"
-#include "mb_ftp/socketfifo.h"
-#include "mb_ftp/fifo.h"
+#include "mb_ftp/drive/socketfifo.h"
+#include "mb_ftp/drive/fifo.h"
 
 
 
@@ -229,7 +229,6 @@ static const char mb_ftp_pass[]={"12345678"};
 
 static SocketFifoElement_t mb_ftp_fifoelements[MB_FTP_SOCKETFIFO_ELEMENTS_MAX];
 static FIFO_t mb_ftp_socketfifo;
-static FATFS mb_fatfs;
 
 /******************************************************************************
  DEFINE VFS WRAPPER FUNCTIONS
@@ -1071,7 +1070,7 @@ void mb_ftp_run()
 		   }
 		   else if (result == MB_FTP_RESULT_CONTINUE)
 		   {
-			 if (mb_ftp_manager.dtimeout++ > 500) 
+			 if (mb_ftp_manager.dtimeout++ > 10000000) 
 			 {
 			   mb_ftp_close_files();
 			   mb_ftp_send_reply(426, NULL);
@@ -1126,7 +1125,7 @@ void mb_ftp_run()
  			 // close the listening and the data socket
              mb_ftp_close_socket(&mb_ftp_manager.sd_sd);
              mb_ftp_close_socket(&mb_ftp_manager.cd_sd);
-             //ftp_close_filesystem_on_error ();
+             mb_ftp_close_filesystem_on_error ();
              mb_ftp_manager.data_trans_state = MB_FTP_DATATRANS_DISCONNECTED;
            }
 		   break;
@@ -1235,7 +1234,6 @@ STATIC void mb_ftp_cmd_process()
 	 	  if (mb_ftp_open_dir_for_listing(mb_ftp_path) == MB_FTP_RESULT_CONTINUE)
 		  {
 			mb_ftp_manager.state = MB_FTP_STE_CONTINUE_LISTING;
-            printf("makeblock :MB_FTP_STE_CONTINUE_LISTING\n");
 			mb_ftp_send_reply(150, NULL);
           } 
 		  else
@@ -1389,225 +1387,14 @@ STATIC void mb_ftp_cmd_process()
   {
   	if (mb_ftp_manager.ctimeout++ > 100000000/*(servers_get_timeout() / FTP_CYCLE_TIME_MS)*/) 
 	{
-	  //mb_ftp_send_reply(221, NULL); //fftust:debug
 	  mb_ftp_manager.ctimeout=0;
   	}
   } 
   else
   {
-    //mb_ftp_send_reply (1000, "Makeblock:socket closed");
 	mb_ftp_close_client_sockets();
-	//printf("makeblock:socketclosed");
-    //ESP_LOGI("makeblock:","socketclosed\n");
   }
-  #if 0
-   if (E_FTP_RESULT_OK == (result = ftp_recv_non_blocking(ftp_data.c_sd, ftp_cmd_buffer, FTP_MAX_PARAM_SIZE + FTP_CMD_SIZE_MAX, &len))) {
-  	// bufptr is moved as commands are being popped
-  	ftp_cmd_index_t cmd = ftp_pop_command(&bufptr);
-  	if (!ftp_data.loggin.passvalid && (cmd != E_FTP_CMD_USER && cmd != E_FTP_CMD_PASS && cmd != E_FTP_CMD_QUIT)) {
-  		ftp_send_reply(332, NULL);
-  		return;
-  	}
-  	switch (cmd) {
-  	case E_FTP_CMD_FEAT:
-  		ftp_send_reply(211, "no-features");
-  		break;
-  	case E_FTP_CMD_SYST:
-  		ftp_send_reply(215, "UNIX Type: L8");
-  		break;
-  	case E_FTP_CMD_CDUP:
-  		ftp_close_child(ftp_path);
-  		ftp_send_reply(250, NULL);
-  		break;
-  	case E_FTP_CMD_CWD:
-  		{
-  			fres = FR_NO_PATH;
-  			ftp_pop_param (&bufptr, ftp_scratch_buffer);
-  			ftp_open_child (ftp_path, ftp_scratch_buffer);
-  			if ((ftp_path[0] == '/' && ftp_path[1] == '\0') || ((fres = f_opendir (&ftp_data.dp, ftp_path)) == FR_OK)) {
-  				if (fres == FR_OK) {
-  					f_closedir(&ftp_data.dp);
-  				}
-  				ftp_send_reply(250, NULL);
-  			} else {
-  				ftp_close_child (ftp_path);
-  				ftp_send_reply(550, NULL);
-  			}
-  		}
-  		break;
-  	case E_FTP_CMD_PWD:
-  	case E_FTP_CMD_XPWD:
-  		ftp_send_reply(257, ftp_path);
-  		break;
-  	case E_FTP_CMD_SIZE:
-  		{
-  			ftp_get_param_and_open_child (&bufptr);
-  			if (FR_OK == f_stat (ftp_path, &fno)) {
-  				// send the size
-  				snprintf((char *)ftp_data.dBuffer, FTP_BUFFER_SIZE, "%u", (uint32_t)fno.fsize);
-  				ftp_send_reply(213, (char *)ftp_data.dBuffer);
-  			} else {
-  				ftp_send_reply(550, NULL);
-  			}
-  		}
-  		break;
-  	case E_FTP_CMD_MDTM:
-  		ftp_get_param_and_open_child (&bufptr);
-  		if (FR_OK == f_stat (ftp_path, &fno)) {
-  			// send the last modified time
-  			snprintf((char *)ftp_data.dBuffer, FTP_BUFFER_SIZE, "%u%02u%02u%02u%02u%02u",
-  					 1980 + ((fno.fdate >> 9) & 0x7f), (fno.fdate >> 5) & 0x0f,
-  					 fno.fdate & 0x1f, (fno.ftime >> 11) & 0x1f,
-  					 (fno.ftime >> 5) & 0x3f, 2 * (fno.ftime & 0x1f));
-  			ftp_send_reply(213, (char *)ftp_data.dBuffer);
-  		} else {
-  			ftp_send_reply(550, NULL);
-  		}
-  		break;
-  	case E_FTP_CMD_TYPE:
-  		ftp_send_reply(200, NULL);
-  		break;
-  	case E_FTP_CMD_USER:
-  		ftp_pop_param (&bufptr, ftp_scratch_buffer);
-  		if (!memcmp(ftp_scratch_buffer, servers_user, MAX(strlen(ftp_scratch_buffer), strlen(servers_user)))) {
-  			ftp_data.loggin.uservalid = true && (strlen(servers_user) == strlen(ftp_scratch_buffer));
-  		}
-  		ftp_send_reply(331, NULL);
-  		break;
-  	case E_FTP_CMD_PASS:
-  		ftp_pop_param (&bufptr, ftp_scratch_buffer);
-  		if (!memcmp(ftp_scratch_buffer, servers_pass, MAX(strlen(ftp_scratch_buffer), strlen(servers_pass))) &&
-  				ftp_data.loggin.uservalid) {
-  			ftp_data.loggin.passvalid = true && (strlen(servers_pass) == strlen(ftp_scratch_buffer));
-  			if (ftp_data.loggin.passvalid) {
-  				ftp_send_reply(230, NULL);
-  				break;
-  			}
-  		}
-  		ftp_send_reply(530, NULL);
-  		break;
-  	case E_FTP_CMD_PASV:
-  		{
-  			// some servers (e.g. google chrome) send PASV several times very quickly
-  			servers_close_socket(&ftp_data.d_sd);
-  			ftp_data.substate = E_FTP_STE_SUB_DISCONNECTED;
-  			bool socketcreated = true;
-  			if (ftp_data.ld_sd < 0) {
-  				socketcreated = ftp_create_listening_socket(&ftp_data.ld_sd, FTP_PASIVE_DATA_PORT, FTP_DATA_CLIENTS_MAX - 1);
-  			}
-  			if (socketcreated) {
-  				uint8_t *pip = (uint8_t *)&ftp_data.ip_addr;
-  				ftp_data.dtimeout = 0;
-  				snprintf((char *)ftp_data.dBuffer, FTP_BUFFER_SIZE, "(%u,%u,%u,%u,%u,%u)",
-  						 pip[0], pip[1], pip[2], pip[3], (FTP_PASIVE_DATA_PORT >> 8), (FTP_PASIVE_DATA_PORT & 0xFF));
-  				ftp_data.substate = E_FTP_STE_SUB_LISTEN_FOR_DATA;
-  				ftp_send_reply(227, (char *)ftp_data.dBuffer);
-  			} else {
-  				ftp_send_reply(425, NULL);
-  			}
-  		}
-  		break;
-  	case E_FTP_CMD_LIST:
-  		if (ftp_open_dir_for_listing(ftp_path) == E_FTP_RESULT_CONTINUE) {
-  			ftp_data.state = E_FTP_STE_CONTINUE_LISTING;
-  			ftp_send_reply(150, NULL);
-  		} else {
-  			ftp_send_reply(550, NULL);
-  		}
-  		break;
-  	case E_FTP_CMD_RETR:
-  		ftp_get_param_and_open_child (&bufptr);
-  		if (ftp_open_file (ftp_path, FA_READ)) {
-  			ftp_data.state = E_FTP_STE_CONTINUE_FILE_TX;
-  			ftp_send_reply(150, NULL);
-  		} else {
-  			ftp_data.state = E_FTP_STE_END_TRANSFER;
-  			ftp_send_reply(550, NULL);
-  		}
-  		break;
-  	case E_FTP_CMD_STOR:
-  		ftp_get_param_and_open_child (&bufptr);
-  		// first check if a software update is being requested
-  		if (updater_check_path (ftp_path)) {
-  			if (updater_start()) {
-  				ftp_data.special_file = true;
-  				ftp_data.state = E_FTP_STE_CONTINUE_FILE_RX;
-  				ftp_send_reply(150, NULL);
-  			} else {
-  				// to unlock the updater
-  				updater_finish();
-  				ftp_data.state = E_FTP_STE_END_TRANSFER;
-  				ftp_send_reply(550, NULL);
-  			}
-  		} else {
-  			if (ftp_open_file (ftp_path, FA_WRITE | FA_CREATE_ALWAYS)) {
-  				ftp_data.state = E_FTP_STE_CONTINUE_FILE_RX;
-  				ftp_send_reply(150, NULL);
-  			} else {
-  				ftp_data.state = E_FTP_STE_END_TRANSFER;
-  				ftp_send_reply(550, NULL);
-  			}
-  		}
-  		break;
-  	case E_FTP_CMD_DELE:
-  	case E_FTP_CMD_RMD:
-  		ftp_get_param_and_open_child (&bufptr);
-  		if (FR_OK == f_unlink(ftp_path)) {
-  			ftp_send_reply(250, NULL);
-  		} else {
-  			ftp_send_reply(550, NULL);
-  		}
-  		break;
-  	case E_FTP_CMD_MKD:
-  		ftp_get_param_and_open_child (&bufptr);
-  		if (FR_OK == f_mkdir(ftp_path)) {
-  			ftp_send_reply(250, NULL);
-  		} else {
-  			ftp_send_reply(550, NULL);
-  		}
-  		break;
-  	case E_FTP_CMD_RNFR:
-  		ftp_get_param_and_open_child (&bufptr);
-  		if (FR_OK == f_stat (ftp_path, &fno)) {
-  			ftp_send_reply(350, NULL);
-  			// save the current path
-  			strcpy ((char *)ftp_data.dBuffer, ftp_path);
-  		} else {
-  			ftp_send_reply(550, NULL);
-  		}
-  		break;
-  	case E_FTP_CMD_RNTO:
-  		ftp_get_param_and_open_child (&bufptr);
-  		// old path was saved in the data buffer
-  		if (FR_OK == (fres = f_rename ((char *)ftp_data.dBuffer, ftp_path))) {
-  			ftp_send_reply(250, NULL);
-  		} else {
-  			ftp_send_reply(550, NULL);
-  		}
-  		break;
-  	case E_FTP_CMD_NOOP:
-  		ftp_send_reply(200, NULL);
-  		break;
-  	case E_FTP_CMD_QUIT:
-  		ftp_send_reply(221, NULL);
-  		break;
-  	default:
-  		// command not implemented
-  		ftp_send_reply(502, NULL);
-  		break;
-  	}
-  
-  	if (ftp_data.closechild) {
-  		ftp_return_to_previous_path(ftp_path, ftp_scratch_buffer);
-  	}
-  } else if (result == E_FTP_RESULT_CONTINUE) {
-  	if (ftp_data.ctimeout++ > (servers_get_timeout() / FTP_CYCLE_TIME_MS)) {
-  		ftp_send_reply(221, NULL);
-  	}
-  } else {
-  	ftp_close_cmd_data();
-  }
-  #endif
+
 }
 
 

@@ -32,8 +32,8 @@
 #include "lib/oofatfs/diskio.h"
 #include "extmod/vfs_fat.h"
 
-#include "makeblock/mb_fatfs/drivers/sflash_diskio.h"
-#include "makeblock/pybflash.h"
+#include "mb_fatfs/drivers/sflash_diskio.h"
+#include "mb_fatfs/pybflash.h"
 
 /******************************************************************************/
 // MicroPython bindings to expose the internal flash as an object with the

@@ -38,8 +38,8 @@
 #include "ff.h"
 #include "diskio.h"
 #include "ffconf.h"
-#include "makeblock/pybflash.h"
-#include "makeblock/mb_fatfs/drivers/sflash_diskio.h"
+#include "mb_fatfs/pybflash.h"
+#include "mb_fatfs/drivers/sflash_diskio.h"
 #include "extmod/vfs_fat.h"
 
 
@@ -56,14 +56,15 @@
 #include "lib/utils/pyexec.h"
 #include "uart.h"
 
+#include "mb_ftp/mb_ftp_task.h"
+#include "mb_ftp/mb_ftp.h"
 #include "modmachine.h"
 #include "mptask.h"
-#include "makeblock/mb_makeblock.h"
-#include "makeblock/mb_sys.h"
+#include "mb_makeblock.h"
+#include "mb_sys.h"
+
 
 extern void process_serial_data(void *pvParameters); 
-
-
 
 // MicroPython runs as a task under FreeRTOS
 #define MP_TASK2_PRIORITY       (ESP_TASK_PRIO_MIN + 2)
@@ -101,6 +102,7 @@ STATIC void sensor_updata(void *pvParameters)
         gyro_board_update();
       }
     }
+	vTaskDelay(20/ portTICK_PERIOD_MS);
   }
 }
 
@@ -116,131 +118,129 @@ STATIC void mptask_create_main_py (void)
   f_close(&fp);
 }
 
-
 STATIC void mptask_init_sflash_filesystem (void)
 {
   FILINFO fno;
   mb_sflash_vfs_fat = pvPortMalloc(sizeof(*mb_sflash_vfs_fat));
-  // Initialise the local flash filesystem.
-  // Create it if needed, and mount in on /flash
     
   fs_user_mount_t *vfs_fat = mb_sflash_vfs_fat;
   vfs_fat->flags = 0;
   pyb_flash_init_vfs(vfs_fat);
-
   FRESULT res = f_mount(&vfs_fat->fatfs);
+
   if (res == FR_NO_FILESYSTEM)
   {
-    // no filesystem, so create a fresh one
     uint8_t working_buf[_MAX_SS];
-    res = f_mkfs(&vfs_fat->fatfs, FM_FAT | FM_SFD, 0, working_buf, sizeof(working_buf));
-    //res = f_mkfs(&vfs_fat->fatfs, FM_SFD | FM_FAT, 0, NULL, 0);
+    res=f_mkfs(&vfs_fat->fatfs, FM_FAT | FM_SFD, 0, working_buf, sizeof(working_buf));
+	f_mount(&mb_sflash_vfs_fat->fatfs);
+	if (FR_OK != f_chdir (&vfs_fat->fatfs,"/flash")) 
+	{
+      printf("create flash! 2\r\n");
+	  f_mkdir(&vfs_fat->fatfs,"/flash");
+	}
+	else
+	{
+	  printf("flash find! 2\r\n");
+	}
+
     if (res != FR_OK)
 	{
       printf("no file sys,failed to create flash\n");
     }
-    // create empty main.py
     mptask_create_main_py();
-    }
-    else if (res == FR_OK)
+  }
+  else if (res == FR_OK)
+  {
+    f_chdir(&mb_sflash_vfs_fat->fatfs,"/flash");
+    if (FR_OK != f_stat(&mb_sflash_vfs_fat->fatfs,"main.py", &fno))
 	{
-      // mount sucessful
-      //f_chdir (&mb_sflash_vfs_fat->fatfs,"/flash");
-      if (FR_OK != f_stat(&mb_sflash_vfs_fat->fatfs,"main.py", &fno))
-	  {
-        // create empty main.py
-        mptask_create_main_py();
-      }
+      mptask_create_main_py();
     }
-	else
-	{
-      printf("failed to create flash,res:%d\n",res);
-    }
+  }
+  else
+  {
+    printf("failed to create flash,res:%d\n",res);
+  }
 
 
+  
+  mp_vfs_mount_t *vfs = m_new_obj_maybe(mp_vfs_mount_t);
+  if (vfs == NULL) 
+  {
+    printf("makeblock:fatal error");
+  }
 
-    mp_vfs_mount_t *vfs = m_new_obj_maybe(mp_vfs_mount_t);
-    if (vfs == NULL) 
-	{
-      printf("makeblock:fatal error");
-    }
-    vfs->str = "/flash";
-    vfs->len = 6;
-    vfs->obj = MP_OBJ_FROM_PTR(vfs_fat);
-    vfs->next = NULL;
-    MP_STATE_VM(vfs_mount_table) = vfs;
 
-    // The current directory is used as the boot up directory.
-    // It is set to the internal flash filesystem by default.
-    MP_STATE_PORT(vfs_cur) = vfs;
+  vfs->str = "/flash";
+  vfs->len = 6;
+  vfs->obj = MP_OBJ_FROM_PTR(vfs_fat);
+  vfs->next = NULL;
+  MP_STATE_VM(vfs_mount_table) = vfs;
+  MP_STATE_PORT(vfs_cur) = vfs;  // The current directory is used as the boot up directory.  // It is set to the internal flash filesystem by default.
+  
 
-   
-	FRESULT fftemp;
-	f_chdir (&mb_sflash_vfs_fat->fatfs,"/flash");
-    // create /flash/sys, /flash/lib and /flash/cert if they don't exist
-    if (FR_OK != f_chdir (&vfs_fat->fatfs,"/sys")) {
-        fftemp=f_mkdir(&vfs_fat->fatfs,"/sys");
-		printf("makeblock:fftemp:%d\n",fftemp);
-    }
-
-    if (FR_OK != f_chdir (&vfs_fat->fatfs,"/lib")) {
-        f_mkdir(&vfs_fat->fatfs,"/lib");
-    }
-    if (FR_OK != f_chdir (&vfs_fat->fatfs,"/cert")) {
-        f_mkdir(&vfs_fat->fatfs,"/cert");
-    }
+  if (FR_OK != f_chdir (&vfs_fat->fatfs,"/sys")) 
+  {
+    f_mkdir(&vfs_fat->fatfs,"/sys");
+  }
+  if (FR_OK != f_chdir (&vfs_fat->fatfs,"/lib")) 
+  {
+    f_mkdir(&vfs_fat->fatfs,"/lib");
+  }
+  if (FR_OK != f_chdir (&vfs_fat->fatfs,"/cert"))
+  {
+    f_mkdir(&vfs_fat->fatfs,"/cert");
+  }
 	
-
-    #if 0
-    f_chdir (&vfs_fat->fatfs,"/flash");
-
-    // make sure we have a /flash/boot.py. Create it if needed.
-    res = f_stat(&vfs_fat->fatfs,"/boot.py", &fno);
-    if (res == FR_OK) {
-        if (fno.fattrib & AM_DIR) {
-            // exists as a directory
-            // TODO handle this case
-            // see http://elm-chan.org/fsw/ff/img/app2.c for a "rm -rf" implementation
-        } else {
-            // exists as a file, good!
-        }
-    } else {
-        // doesn't exist, create fresh file
-        FIL fp;
-        f_open(&vfs_fat->fatfs,&fp, "/boot.py", FA_WRITE | FA_CREATE_ALWAYS);
-        UINT n;
-        f_write(&fp, fresh_boot_py, sizeof(fresh_boot_py) - 1 /* don't count null terminator */, &n);
-        // TODO check we could write n bytes
-        f_close(&fp);
-    }
-
-    #endif
+  
 	
+  char mb_read_buffer[128];
+  memset(mb_read_buffer,'X',128);
+  
+  f_chdir(&mb_sflash_vfs_fat->fatfs,"/flash");
+  if (FR_OK != f_stat(&mb_sflash_vfs_fat->fatfs,"boot.py", &fno)) 
+  {
     FIL fp1;
     UINT n1;
-    char mb_read_buffer[128];
-    memset(mb_read_buffer,'X',64);
+
     f_chdir (&mb_sflash_vfs_fat->fatfs,"/flash");
     f_open(&mb_sflash_vfs_fat->fatfs,&fp1, "boot.py", FA_WRITE | FA_CREATE_ALWAYS);
     f_write(&fp1, fresh_boot_py, sizeof(fresh_boot_py) - 1 /* don't count null terminator */, &n1);
     f_close(&fp1);
+	printf("boot.py can't find,created a new one\n");
+  }
+  else
+  {   
+    FIL fp2;
+    UINT n2;
+    f_chdir (&mb_sflash_vfs_fat->fatfs,"/flash");
+    f_open(&mb_sflash_vfs_fat->fatfs,&fp2, "boot.py", FA_READ); //fftust: can not add FA_CREATE_ALWAYS
+    f_read(&fp2, mb_read_buffer, sizeof(fresh_boot_py)-1 /* don't count null terminator */, &n2);
+    f_close(&fp2);
+    mb_read_buffer[sizeof(fresh_boot_py)-1] = '\n';
+    mb_read_buffer[sizeof(fresh_boot_py)] = '\0';
+	printf(mb_read_buffer);
+  }
 
-    if (FR_OK != f_stat(&mb_sflash_vfs_fat->fatfs,"boot.py", &fno)) 
-    {
-      printf("main.py can't find!\n");
-    }
-    else
-    {   
-      FIL fp2;
-      UINT n2;
-      f_chdir (&mb_sflash_vfs_fat->fatfs,"/flash");
-      f_open(&mb_sflash_vfs_fat->fatfs,&fp2, "boot.py", FA_WRITE |FA_READ); //fftust: can not add FA_CREATE_ALWAYS
-      f_read(&fp2, mb_read_buffer, 62 /* don't count null terminator */, &n2);
-      f_close(&fp2);
-      mb_read_buffer[62] = '\n';
-      mb_read_buffer[63] = '\0';
-    }
-    printf(mb_read_buffer);
+  f_chdir (&mb_sflash_vfs_fat->fatfs,"/flash");
+  if (FR_OK != f_stat(&mb_sflash_vfs_fat->fatfs,"main.py", &fno)) 
+  {
+    mptask_create_main_py();
+	printf("main.py can't find,created a new one!\n");
+  }
+  else
+  {   
+    FIL fp3;
+    UINT n3;
+    f_chdir (&mb_sflash_vfs_fat->fatfs,"/flash");
+    f_open(&mb_sflash_vfs_fat->fatfs,&fp3, "main.py", FA_READ); //fftust: can not add FA_CREATE_ALWAYS
+    f_read(&fp3, mb_read_buffer, sizeof(fresh_main_py)-1 , &n3);
+    f_close(&fp3);
+    mb_read_buffer[sizeof(fresh_main_py)-1] = '\n';
+    mb_read_buffer[sizeof(fresh_main_py)] = '\0';
+	printf(mb_read_buffer);
+  }
+  
 }
 
 
@@ -258,11 +258,14 @@ soft_reset:
     readline_init0();
     // initialise peripherals
     machine_pins_init();
+
+	//pyexec_frozen_module("_boot.py");
+	//pyexec_frozen_module("makeblocktest.py");
     mptask_init_sflash_filesystem();
     communication_channel_init();
-   
+    mb_initialise_wifi();
     // run boot-up scripts
-    //pyexec_frozen_module("_boot.py");
+    
     pyexec_file("boot.py");
     if (pyexec_mode_kind == PYEXEC_MODE_FRIENDLY_REPL) {
         pyexec_file("main.py");
@@ -298,7 +301,7 @@ void app_main(void)
   // TODO use xTaskCreateStatic (needs custom FreeRTOSConfig.h)
   xTaskCreatePinnedToCore(mp_task, "mp_task", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0);
   xTaskCreatePinnedToCore(process_serial_data, "process_serial_data", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0);
-  //xTaskCreatePinnedToCore(sensor_updata, "sensor_updata", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0); 
+  xTaskCreatePinnedToCore(sensor_updata, "sensor_updata", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0); 
   xTaskCreatePinnedToCore(mb_ftp_task, "mb_ftp_task", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0);
 }
 

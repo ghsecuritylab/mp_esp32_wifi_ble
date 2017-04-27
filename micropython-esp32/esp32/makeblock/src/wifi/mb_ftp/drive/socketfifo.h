@@ -26,7 +26,7 @@
 
 #ifndef SOCKETFIFO_H_
 #define SOCKETFIFO_H_
-#include "mb_ftp/fifo.h"
+#include "mb_ftp/drive/fifo.h"
 /*----------------------------------------------------------------------------
  ** Imports
  */

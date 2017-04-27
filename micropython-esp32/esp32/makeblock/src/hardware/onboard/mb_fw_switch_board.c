@@ -114,7 +114,7 @@ STATIC mp_obj_t mb_fw_switch_board_value(mp_uint_t n_args, const mp_obj_t *args)
   float value=0;
   
   value=(float)(adc2_get_voltage(MB_FW_SWITCH_BOARD_CHANNEL));
- 
+  
   
   return mp_obj_new_float(value);
 }

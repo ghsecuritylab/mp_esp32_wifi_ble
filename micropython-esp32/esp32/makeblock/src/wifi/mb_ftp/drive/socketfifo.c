@@ -31,8 +31,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#include "mb_ftp/fifo.h"
-#include "mb_ftp/socketfifo.h"
+#include "mb_ftp/drive/fifo.h"
+#include "mb_ftp/drive/socketfifo.h"
 
 
 /*----------------------------------------------------------------------------

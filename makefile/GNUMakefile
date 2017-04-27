@@ -51,6 +51,13 @@ INC += -I../lib/timeutils
 INC += -I../lib/oofatfs
 INC += -I../esp32
 INC += -I../esp32/makeblock
+INC += -I../esp32/makeblock/src
+INC += -I../esp32/makeblock/src/hardware
+INC += -I../esp32/makeblock/src/sys
+INC += -I../esp32/makeblock/src/wifi
+INC += -I../esp32/makeblock/src/hardware/onboard
+INC += -I../esp32/makeblock/src/hardware/mbot 
+INC += -I../esp32/makeblock/src/hardware/dockstation
 INC += -I$(BUILD)
 INC += -I$(ESPCOMP)/bootloader_support/include
 INC += -I$(ESPCOMP)/driver/include
@@ -111,7 +118,6 @@ endif
 
 ################################################################################
 # List of MicroPython source and object files
-
 SRC_C = \
 	main.c \
 	uart.c \
@@ -133,51 +139,61 @@ SRC_C = \
 	espneopixel.c \
 	machine_hw_spi.c \
 	mptask.c \
-	makeblock/modmakeblock.c \
-	makeblock/mb_processcmd.c \
-	makeblock/mb_linefollower.c \
-	makeblock/mb_dcmotor.c \
-	makeblock/mb_ultrasonic_sensor.c\
-	makeblock/mb_light_sensor.c\
-	makeblock/mb_RGBLed.c\
-	makeblock/mb_buzzer.c\
-	makeblock/mb_touch_sensor.c\
-	makeblock/mb_sevseg.c\
-	makeblock/mb_servo.c\
-	makeblock/mb_humiture.c\
-	makeblock/mb_led_matrix.c\
-	makeblock/mb_limitswitch.c\
-	makeblock/mb_temperature.c\
-	makeblock/mb_potentionmeter.c\
-	makeblock/mb_sound_sensor.c\
-	makeblock/mb_flame_sensor.c\
-	makeblock/mb_gas_sensor.c\
-	makeblock/mb_compass.c\
-	makeblock/mb_gyro.c\
-	makeblock/mb_button_inner.c\
-	makeblock/mb_joystick.c\
-	makeblock/mb_pirmotion.c\
-	makeblock/mb_shutter.c\
-	makeblock/mb_button.c\
-	makeblock/mb_irremote.c\
-	makeblock/mb_gyro_board.c\
-	makeblock/mb_button_board.c \
-	makeblock/mb_ledmatrix_board.c\
-	makeblock/mb_light_sensor_board.c\
-	makeblock/mb_potentionmeter_board.c \
-	makeblock/mb_fw_switch_board.c \
-	makeblock/mb_vibratingmotor_board.c \
-	makeblock/mb_sound_sensor_board.c \
-	makeblock/mb_rmt_board.c \
-	makeblock/mb_sys.c \
-	makeblock/mb_ftp/mb_ftp.c \
-	makeblock/mb_ftp/fifo.c  \
-	makeblock/mb_ftp/socketfifo.c \
-	makeblock/mb_ftp_task.c \
-	makeblock/pybflash.c \
-	makeblock/mb_fatfs/drivers/sflash_diskio.c \
+	makeblock/src/modmakeblock.c \
+	makeblock/src/mb_processcmd.c \
 	$(SRC_MOD)
 
+MB_SRC_WIFI_C = $(addprefix makeblock/src/wifi/,\
+	mb_ftp/mb_ftp_task.c \
+	mb_ftp/mb_ftp.c \
+	mb_ftp/drive/fifo.c  \
+	mb_ftp/drive/socketfifo.c \
+	mb_wifi_test.c \
+	)
+MB_SRC_EXTMOD_C = $(addprefix makeblock/src/sys/,\
+    mb_fatfs/drivers/sflash_diskio.c \
+    mb_fatfs/pybflash.c \
+    mb_sys.c \
+	)
+
+MB_SRC_HARDWARE_ONBOARD_C = $(addprefix makeblock/src/hardware/onboard/,\
+    mb_gyro_board.c\
+	mb_button_board.c \
+	mb_ledmatrix_board.c\
+	mb_light_sensor_board.c\
+	mb_potentionmeter_board.c \
+	mb_fw_switch_board.c \
+	mb_vibratingmotor_board.c \
+    mb_sound_sensor_board.c \
+	mb_rmt_board.c \
+	)
+MB_SRC_HARDWARE_MBOT_C = $(addprefix makeblock/src/hardware/mbot/,\
+    mb_linefollower.c \
+	mb_dcmotor.c \
+	mb_ultrasonic_sensor.c\
+	mb_light_sensor.c\
+	mb_RGBLed.c\
+	mb_buzzer.c\
+	mb_touch_sensor.c\
+	mb_sevseg.c\
+	mb_servo.c\
+	mb_humiture.c\
+	mb_led_matrix.c\
+	mb_limitswitch.c\
+	mb_temperature.c\
+	mb_potentionmeter.c\
+	mb_sound_sensor.c\
+	mb_flame_sensor.c\
+	mb_gas_sensor.c\
+	mb_compass.c\
+	mb_gyro.c\
+	mb_button_inner.c\
+	mb_joystick.c\
+	mb_pirmotion.c\
+	mb_shutter.c\
+	mb_button.c\
+	mb_irremote.c\
+	)
 STM_SRC_C = $(addprefix stmhal/,\
 	pybstdio.c \
 	input.c \
@@ -234,9 +250,14 @@ OBJ_MP += $(addprefix $(BUILD)/, $(ESP8266_SRC_C:.c=.o))
 OBJ_MP += $(addprefix $(BUILD)/, $(EXTMOD_SRC_C:.c=.o))
 OBJ_MP += $(addprefix $(BUILD)/, $(LIB_SRC_C:.c=.o))
 OBJ_MP += $(addprefix $(BUILD)/, $(DRIVERS_SRC_C:.c=.o))
+OBJ_MP += $(addprefix $(BUILD)/, $(MB_SRC_HARDWARE_ONBOARD_C:.c=.o))
+OBJ_MP += $(addprefix $(BUILD)/, $(MB_SRC_HARDWARE_MBOT_C:.c=.o))
+OBJ_MP += $(addprefix $(BUILD)/, $(MB_SRC_EXTMOD_C:.c=.o))
+OBJ_MP += $(addprefix $(BUILD)/, $(MB_SRC_WIFI_C:.c=.o))
 
 # List of sources for qstr extraction
-SRC_QSTR += $(SRC_C) $(STM_SRC_C) $(ESP8266_SRC_C) $(EXTMOD_SRC_C) $(DRIVERS_SRC_C)
+SRC_QSTR += $(SRC_C) $(STM_SRC_C) $(ESP8266_SRC_C) $(EXTMOD_SRC_C) $(DRIVERS_SRC_C) \
+            $(MB_SRC_HARDWARE_ONBOARD_C) $(MB_SRC_SENSOR_MBOT_C) $(MB_SRC_EXTMOD_C) $(MB_SRC_WIFI_C)
 # Append any auto-generated sources that are needed by sources listed in SRC_QSTR
 SRC_QSTR_AUTO_DEPS +=
 

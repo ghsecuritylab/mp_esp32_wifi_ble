@@ -4,8 +4,8 @@
 
 #include "py/mpconfig.h"
 #include "py/obj.h"
-#include "makeblock/mb_fatfs/diskio.h"
-#include "makeblock/mb_fatfs/drivers/sflash_diskio.h"
+#include "mb_fatfs/diskio.h"
+#include "mb_fatfs/drivers/sflash_diskio.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
