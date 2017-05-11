@@ -117,14 +117,28 @@ void mb_button_board_config()
   io_conf.mode = GPIO_MODE_INPUT;
   io_conf.pin_bit_mask = (1<<BUTTON1_IO) ;//GPIO_OUTPUT_PIN_SEL;
   io_conf.pull_down_en = 0;
-  io_conf.pull_up_en = 1;
+  io_conf.pull_up_en = 0;
   gpio_config(&io_conf);
 
   io_conf.intr_type = GPIO_PIN_INTR_DISABLE;     
   io_conf.mode = GPIO_MODE_INPUT;
-  io_conf.pin_bit_mask = (1<<BUTTON1_IO) ;//GPIO_OUTPUT_PIN_SEL;
+  io_conf.pin_bit_mask = (1<<BUTTON2_IO) ;//GPIO_OUTPUT_PIN_SEL;
   io_conf.pull_down_en = 0;
-  io_conf.pull_up_en = 1;
+  io_conf.pull_up_en = 0;
+  gpio_config(&io_conf); 
+
+  io_conf.intr_type = GPIO_PIN_INTR_DISABLE;     
+  io_conf.mode = GPIO_MODE_INPUT;
+  io_conf.pin_bit_mask = (1<<BUTTON3_IO) ;//GPIO_OUTPUT_PIN_SEL;
+  io_conf.pull_down_en = 0;
+  io_conf.pull_up_en = 0;
+  gpio_config(&io_conf); 
+
+  io_conf.intr_type = GPIO_PIN_INTR_DISABLE;     
+  io_conf.mode = GPIO_MODE_INPUT;
+  io_conf.pin_bit_mask = (1<<BUTTON4_IO) ;//GPIO_OUTPUT_PIN_SEL;
+  io_conf.pull_down_en = 0;
+  io_conf.pull_up_en = 0;
   gpio_config(&io_conf); 
 
 }
@@ -134,20 +148,24 @@ STATIC mp_obj_t mb_button_board_value(mp_uint_t n_args, const mp_obj_t *args)
   float value=0;
   mb_button_board_obj_t *self = args[0];
   self->butt = mp_obj_get_int(args[1]);
-  if(self->butt==1)
+  switch(self->butt)
   {
-    value= (float)(gpio_get_level(BUTTON1_IO));
+    case 1:
+	     value= (float)(gpio_get_level(BUTTON1_IO));
+         break;
+    case 2:
+         value= (float)(gpio_get_level(BUTTON2_IO));
+  	     break;
+    case 3:
+		 value= (float)(gpio_get_level(BUTTON3_IO));
+		 break;
+    case 4:
+	     value= (float)(gpio_get_level(BUTTON4_IO));
+         break;
+	default:	 
+		 break;
+    //printf("PARA ERROR: please input the para between 1 to 2\n");  
   }
-  else if(self->butt==2)
-  {
-    value= (float)(gpio_get_level(BUTTON2_IO));
-  }	  
-  else
-  { 
-    //printf("PARA ERROR: please input the para between 1 to 2\n");
-    
-  }
-  
   return mp_obj_new_float(value);
 }
 

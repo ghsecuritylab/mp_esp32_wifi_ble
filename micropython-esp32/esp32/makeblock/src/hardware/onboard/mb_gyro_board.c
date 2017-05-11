@@ -48,9 +48,7 @@
 
 #include "py/mpstate.h"
 #include "py/runtime.h"
-//#include "teensy/core/core_pins.h"	
-
-
+	
 #include "soc/uart_struct.h"
 #include "uart.h"
 

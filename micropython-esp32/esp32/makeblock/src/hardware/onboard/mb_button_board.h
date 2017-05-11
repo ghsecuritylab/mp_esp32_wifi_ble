@@ -37,8 +37,10 @@
 #ifndef MB_BUTTON_BOARD_H_
 #define MB_BUTTON_BOARD_H_
 
-#define BUTTON1_IO    0
-#define BUTTON2_IO    23
+#define BUTTON1_IO    15
+#define BUTTON2_IO    12
+#define BUTTON3_IO    0
+#define BUTTON4_IO    2
 
 extern void mb_button_board_config();  
 

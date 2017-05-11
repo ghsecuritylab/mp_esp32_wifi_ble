@@ -23,6 +23,7 @@
 #include "rom/cache.h"
 
 #include "soc/cpu.h"
+#include "soc/rtc.h"
 #include "soc/dport_reg.h"
 #include "soc/io_mux_reg.h"
 #include "soc/rtc_cntl_reg.h"
@@ -54,9 +55,11 @@
 #include "esp_int_wdt.h"
 #include "esp_task_wdt.h"
 #include "esp_phy_init.h"
+#include "esp_cache_err_int.h"
 #include "esp_coexist.h"
 #include "esp_panic.h"
 #include "esp_core_dump.h"
+#include "esp_app_trace.h"
 #include "trax.h"
 
 #define STRINGIFY(s) STRINGIFY2(s)
@@ -109,6 +112,7 @@ void IRAM_ATTR call_start_cpu0()
 #if !CONFIG_FREERTOS_UNICORE
     rst_reas[1] = rtc_get_reset_reason(1);
 #endif
+
     // from panic handler we can be reset by RWDT or TG0WDT
     if (rst_reas[0] == RTCWDT_SYS_RESET || rst_reas[0] == TG0WDT_SYS_RESET
 #if !CONFIG_FREERTOS_UNICORE
@@ -116,17 +120,16 @@ void IRAM_ATTR call_start_cpu0()
 #endif
         ) {
         // stop wdt in case of any
-        ESP_EARLY_LOGI(TAG, "Stop panic WDT");
         esp_panic_wdt_stop();
     }
 
+    //Clear BSS. Please do not attempt to do any complex stuff (like early logging) before this.
     memset(&_bss_start, 0, (&_bss_end - &_bss_start) * sizeof(_bss_start));
 
     /* Unless waking from deep sleep (implying RTC memory is intact), clear RTC bss */
     if (rst_reas[0] != DEEPSLEEP_RESET) {
         memset(&_rtc_bss_start, 0, (&_rtc_bss_end - &_rtc_bss_start) * sizeof(_rtc_bss_start));
     }
-
 
     ESP_EARLY_LOGI(TAG, "Pro cpu up.");
 
@@ -191,8 +194,8 @@ void start_cpu0_default(void)
 {
     esp_setup_syscall_table();
 //Enable trace memory and immediately start trace.
-#if CONFIG_MEMMAP_TRACEMEM
-#if CONFIG_MEMMAP_TRACEMEM_TWOBANKS
+#if CONFIG_ESP32_TRAX
+#if CONFIG_ESP32_TRAX_TWOBANKS
     trax_enable(TRAX_ENA_PRO_APP);
 #else
     trax_enable(TRAX_ENA_PRO);
@@ -201,7 +204,7 @@ void start_cpu0_default(void)
 #endif
     esp_set_cpu_freq();     // set CPU frequency configured in menuconfig
 #ifndef CONFIG_CONSOLE_UART_NONE
-    uart_div_modify(CONFIG_CONSOLE_UART_NUM, (APB_CLK_FREQ << 4) / CONFIG_CONSOLE_UART_BAUDRATE);
+    uart_div_modify(CONFIG_CONSOLE_UART_NUM, (rtc_clk_apb_freq_get() << 4) / CONFIG_CONSOLE_UART_BAUDRATE);
 #endif
 #if CONFIG_BROWNOUT_DET
     esp_brownout_init();
@@ -220,6 +223,12 @@ void start_cpu0_default(void)
     _GLOBAL_REENT->_stdout = (FILE*) &__sf_fake_stdout;
     _GLOBAL_REENT->_stderr = (FILE*) &__sf_fake_stderr;
 #endif
+#if CONFIG_ESP32_APPTRACE_ENABLE
+    esp_err_t err = esp_apptrace_init();
+    if (err != ESP_OK) {
+        ESP_EARLY_LOGE(TAG, "Failed to init apptrace module on CPU0 (%d)!", err);
+    }
+#endif
     do_global_ctors();
 #if CONFIG_INT_WDT
     esp_int_wdt_init();
@@ -227,6 +236,7 @@ void start_cpu0_default(void)
 #if CONFIG_TASK_WDT
     esp_task_wdt_init();
 #endif
+    esp_cache_err_int_init();
     esp_crosscore_int_init();
     esp_ipc_init();
     spi_flash_init();
@@ -247,8 +257,14 @@ void start_cpu0_default(void)
 #if !CONFIG_FREERTOS_UNICORE
 void start_cpu1_default(void)
 {
-#if CONFIG_MEMMAP_TRACEMEM_TWOBANKS
+#if CONFIG_ESP32_TRAX_TWOBANKS
     trax_start_trace(TRAX_DOWNCOUNT_WORDS);
+#endif
+#if CONFIG_ESP32_APPTRACE_ENABLE
+    esp_err_t err = esp_apptrace_init();
+    if (err != ESP_OK) {
+        ESP_EARLY_LOGE(TAG, "Failed to init apptrace module on CPU1 (%d)!", err);
+    }
 #endif
     // Wait for FreeRTOS initialization to finish on PRO CPU
     while (port_xSchedulerRunning[0] == 0) {
@@ -256,6 +272,7 @@ void start_cpu1_default(void)
     }
     //Take care putting stuff here: if asked, FreeRTOS will happily tell you the scheduler
     //has started, but it isn't active *on this CPU* yet.
+    esp_cache_err_int_init();
     esp_crosscore_int_init();
 
     ESP_EARLY_LOGI(TAG, "Starting scheduler on APP CPU.");

@@ -1,2 +1,6 @@
-import makeblocktest
+from mb_button_board import makeblock_button
+from mb_linefollower import makeblock_linefollower
+from mb_dcmotor import makeblock_dcmotor
+from mb_wlan import makeblock_wlan
+from mb_ledmatrix import makeblock_ledmatrix
 

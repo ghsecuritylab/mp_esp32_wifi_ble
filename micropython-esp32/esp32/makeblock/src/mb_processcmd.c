@@ -40,12 +40,15 @@
 #include "py/mpstate.h"
 #include "py/runtime.h"
 
+
 #include "driver/uart.h"
 #include "soc/uart_struct.h"
 #include "uart.h"
 #include "esp32_mphal.h"
 
 #include "mb_processcmd.h"
+
+
 
 /******************************************************************************
  MACRO DEFINITION
@@ -54,8 +57,8 @@
 
 #define ECHO_TEST_TXD  (17)
 #define ECHO_TEST_RXD  (16)
-#define ECHO_TEST_RTS  (12)
-#define ECHO_TEST_CTS  (22)
+#define ECHO_TEST_RTS  (23) //fftust:the configer of RTS AND CTS will influence these two pins,it should be  
+#define ECHO_TEST_CTS  (22) //configed to some pins that would not be used or just cancel these two configer
 
 /******************************************************************************
  DECLARE CONSTANTS
@@ -139,7 +142,7 @@ void process_serial_data(void *pvParameters)
   while(1)
   {
 	//Read data from UART1
-    int len = uart_read_bytes(UART_NUM_1, data, BUF_SIZE, 20 / portTICK_RATE_MS);
+	int len = uart_read_bytes(UART_NUM_1, data, BUF_SIZE, 20 / portTICK_RATE_MS);
     //Write data back to UART0
     if(len > 0)
     {
@@ -147,10 +150,11 @@ void process_serial_data(void *pvParameters)
 	  rsp_be_received = true;
 	  if(pure_command_mode == true)
       {
-        mp_hal_stdout_tx_strn((const char*)data,len);
+        //mp_hal_stdout_tx_strn((const char*)data,len);
 	  }
 	  memcpy(read_buffer_data,data,len);
     }
+	vTaskDelay(20/portTICK_PERIOD_MS);
   }
 }
 

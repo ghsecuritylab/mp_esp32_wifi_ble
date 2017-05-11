@@ -34,5 +34,6 @@
 #ifndef _MB_WLAN_H
 #define _MB_WLAN_H
 
+extern const mp_obj_type_t mb_wlan_type;
 
 #endif

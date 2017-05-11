@@ -110,7 +110,7 @@ STATIC mp_obj_t mb_rgbled_show(mp_uint_t n_args, const mp_obj_t *args)
   uint8_t index = 0;  
   mb_rgbled_obj_t *self = args[0];
   self->port       = mp_obj_get_int(args[1]);
-  self->rgb_slot= mp_obj_get_int(args[2]);
+  self->rgb_slot   = mp_obj_get_int(args[2]);
   self->rgb_leds   = mp_obj_get_int(args[3]);
   self->rgb_r      = mp_obj_get_int(args[4]);
   self->rgb_g      = mp_obj_get_int(args[5]);

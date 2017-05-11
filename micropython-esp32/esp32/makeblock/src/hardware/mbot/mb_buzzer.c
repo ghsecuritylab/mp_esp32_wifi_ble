@@ -106,10 +106,10 @@ STATIC mp_obj_t mb_buzzer_play(mp_uint_t n_args, const mp_obj_t *args)
   uint8_t length = 1+1+1+4;   // index + action + device  + buzzer_a + _b + _c +_d
   uint8_t index = 0;  
   mb_buzzer_obj_t *self = args[0];
-  self->buzzer_a    = mp_obj_get_int(args[1]);
-  self->buzzer_b    = mp_obj_get_int(args[2]);
-  self->buzzer_c    = mp_obj_get_int(args[3]);
-  self->buzzer_d    = mp_obj_get_int(args[4]);
+  self->buzzer_a        = mp_obj_get_int(args[1]);
+  self->buzzer_b        = mp_obj_get_int(args[2]);
+  self->buzzer_c        = mp_obj_get_int(args[3]);
+  self->buzzer_d        = mp_obj_get_int(args[4]);
   
   write_head();
   write_serial(length);

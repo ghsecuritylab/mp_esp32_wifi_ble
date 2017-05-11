@@ -68,8 +68,14 @@
 #include "mb_light_sensor_board.h"
 #include "mb_potentionmeter_board.h"
 #include "mb_fw_switch_board.h"
+#include "mb_tw_switch_board.h"
 #include "mb_vibratingmotor_board.h"
 #include "mb_sound_sensor_board.h"
 #include "mb_rmt_board.h"
 #include "mb_wifi_test.h"
+#include "mb_wlan.h"
+#include "mb_version_check.h"
+#include "mb_dockstation_check.h"
+
+
 #endif

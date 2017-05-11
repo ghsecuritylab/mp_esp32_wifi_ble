@@ -37,7 +37,7 @@
 #ifndef MB_LEDMATRIX_BOARD_H_
 #define MB_LEDMATRIX_BOARD_H_
 
-#define DIGITAL_SCL_IO    12
+#define DIGITAL_SCL_IO    23
 #define DIGITAL_SDA_IO    22
 
 typedef enum 

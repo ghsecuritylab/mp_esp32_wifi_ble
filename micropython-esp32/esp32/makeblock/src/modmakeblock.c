@@ -98,10 +98,14 @@ STATIC const mp_map_elem_t makeblock_module_globals_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR_light_sensor_board),        (mp_obj_t)&mb_light_sensor_board_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR_potentionmeter_board),      (mp_obj_t)&mb_potentionmeter_board_type },
     { MP_OBJ_NEW_QSTR(MP_QSTR_fw_switch_board),           (mp_obj_t)&mb_fw_switch_board_type },   
+    { MP_OBJ_NEW_QSTR(MP_QSTR_tw_switch_board),           (mp_obj_t)&mb_tw_switch_board_type }, 
     { MP_OBJ_NEW_QSTR(MP_QSTR_vibratingmotor_board),      (mp_obj_t)&mb_vibratingmotor_board_type }, 
     { MP_OBJ_NEW_QSTR(MP_QSTR_sound_sensor_board),        (mp_obj_t)&mb_sound_sensor_board_type }, 
     { MP_OBJ_NEW_QSTR(MP_QSTR_rmt_board),                 (mp_obj_t)&mb_rmt_board_type }, 
     { MP_OBJ_NEW_QSTR(MP_QSTR_wifi_test),                 (mp_obj_t)&mb_wifi_test_type },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_wlan),                      (mp_obj_t)&mb_wlan_type },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_version_check),             (mp_obj_t)&mb_version_check_type },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_dockstation_check),         (mp_obj_t)&mb_dockstation_check_type },
 };
 
 STATIC MP_DEFINE_CONST_DICT(makeblock_module_globals, makeblock_module_globals_table);

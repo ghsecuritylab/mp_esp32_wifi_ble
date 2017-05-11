@@ -89,7 +89,6 @@ STATIC mp_obj_t mb_dcmotor_make_new(const mp_obj_type_t *type, mp_uint_t n_args,
   // parse args
   mp_map_t kw_args;
   mp_map_init_fixed_table(&kw_args, n_kw, all_args + n_args);
-  communication_channel_init();
 
   // setup the object
   mb_dcmotor_obj_t *self = &mb_dcmotor_obj;

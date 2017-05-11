@@ -40,7 +40,6 @@ enum {
     SIG_PRF_WORK = 0xfd,
     SIG_BTU_START_UP = 0xfe,
     SIG_BTU_WORK = 0xff,
-    SIG_BTIF_WORK = 0xff
 };
 
 #define HCI_HOST_TASK_STACK_SIZE        (2048 + BT_TASK_EXTRA_STACK_SIZE)
@@ -61,7 +60,7 @@ enum {
 #define BTC_TASK_STACK_SIZE             (CONFIG_BTC_TASK_STACK_SIZE + BT_TASK_EXTRA_STACK_SIZE)	//by menuconfig
 #define BTC_TASK_NAME                   "btcT"
 #define BTC_TASK_PRIO                   (configMAX_PRIORITIES - 6)
-#define BTC_TASK_QUEUE_NUM              20
+#define BTC_TASK_QUEUE_NUM              60
 
 void btu_task_post(uint32_t sig);
 void hci_host_task_post(void);
