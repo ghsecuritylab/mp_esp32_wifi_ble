@@ -69,9 +69,10 @@ $(BUILD)/%.pp: %.c
 # to get built before we try to compile any of them.
 $(OBJ): | $(HEADER_BUILD)/qstrdefs.generated.h $(HEADER_BUILD)/mpversion.h
 
+SPC_CFLAGS += $(CFLAGS) -I$(ESPCOMP)/bt/bluedroid/osi/include
 $(HEADER_BUILD)/qstr.i.last: $(SRC_QSTR) | $(HEADER_BUILD)/mpversion.h
 	$(ECHO) "GEN $@"
-	$(Q)$(CPP) $(QSTR_GEN_EXTRA_CFLAGS) $(CFLAGS) $? >$(HEADER_BUILD)/qstr.i.last;
+	$(Q)$(CPP) $(QSTR_GEN_EXTRA_CFLAGS) $(SPC_CFLAGS) $? >$(HEADER_BUILD)/qstr.i.last;
 
 $(HEADER_BUILD)/qstr.split: $(HEADER_BUILD)/qstr.i.last
 	$(ECHO) "GEN $@"

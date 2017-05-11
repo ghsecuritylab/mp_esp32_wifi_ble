@@ -28,11 +28,12 @@
 
 #include <stdio.h>
 #include <string.h>
-
+#include "esp_attr.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
 #include "nvs_flash.h"
+#include "esp_partition.h"
 #include "esp_task.h"
 
 #include "ff.h"
@@ -62,7 +63,9 @@
 #include "mptask.h"
 #include "mb_makeblock.h"
 #include "mb_sys.h"
+#include "nvs.h"
 
+#include "makeblock/src/bt/device/mb_ble_device.h"
 
 extern void process_serial_data(void *pvParameters); 
 
@@ -71,11 +74,11 @@ extern void process_serial_data(void *pvParameters);
 #define MP_TASK_PRIORITY        (ESP_TASK_PRIO_MIN + 1)
 #define MP_TASK_STACK_SIZE      (16 * 1024)
 #define MP_TASK_STACK_LEN       (MP_TASK_STACK_SIZE / sizeof(StackType_t))
-#define MP_TASK_HEAP_SIZE       (96 * 1024)
+#define MP_TASK_HEAP_SIZE       (32 * 1024)
 
 //STATIC StaticTask_t mp_task_tcb;
 //STATIC StackType_t mp_task_stack[MP_TASK_STACK_LEN] __attribute__((aligned (8)));
-STATIC uint8_t mp_task_heap[MP_TASK_HEAP_SIZE];
+STATIC DRAM_ATTR uint8_t mp_task_heap[MP_TASK_HEAP_SIZE];
 
 /******************************************************************************
  DECLARE PRIVATE DATA
@@ -295,11 +298,23 @@ soft_reset:
     goto soft_reset;
 }
 
+
+void example_task(void *pvParameter) {
+  while ( 1 ) {
+    printf( "example task run...\n" );
+	vTaskDelay( 100 );
+  }
+}
+
 void app_main(void)
 {
   nvs_flash_init();
+  mb_ble_device_init();  
+  
   // TODO use xTaskCreateStatic (needs custom FreeRTOSConfig.h)
-  xTaskCreatePinnedToCore(mp_task, "mp_task", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0);
+  // xTaskCreatePinnedToCore(example_task, "example_task", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0);
+  
+  xTaskCreatePinnedToCore(mp_task, "mp_task", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0);  
   xTaskCreatePinnedToCore(process_serial_data, "process_serial_data", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0);
   xTaskCreatePinnedToCore(sensor_updata, "sensor_updata", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0); 
   xTaskCreatePinnedToCore(mb_ftp_task, "mb_ftp_task", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0);
