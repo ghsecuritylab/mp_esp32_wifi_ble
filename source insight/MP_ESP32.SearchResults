@@ -1,3 +1,0 @@
----- CONFIG_BT_DRAM_RELEASE Matches (2 in 2 files) ----
-Bt.c (esp-idf\components\bt):#ifdef CONFIG_BT_DRAM_RELEASE
-Heap_alloc_caps.c (esp-idf\components\esp32):#if CONFIG_BT_DRAM_RELEASE
