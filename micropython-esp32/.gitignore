@@ -36,8 +36,6 @@ __pycache__/
 
 # Customized Makefile/project overrides
 ######################
-GNUmakefile
-makefile
 user.props
 
 # Generated rst files
