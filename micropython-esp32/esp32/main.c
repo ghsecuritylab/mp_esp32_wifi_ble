@@ -28,23 +28,18 @@
 
 #include <stdio.h>
 #include <string.h>
-
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "esp_task.h"
-
 #include "soc/cpu.h"
-
-
 #include "ff.h"
 #include "diskio.h"
 #include "ffconf.h"
 #include "mb_fatfs/pybflash.h"
 #include "mb_fatfs/drivers/sflash_diskio.h"
 #include "extmod/vfs_fat.h"
-
 #include "py/stackctrl.h"
 #include "py/nlr.h"
 #include "py/compile.h"
@@ -55,16 +50,15 @@
 #include "lib/mp-readline/readline.h"
 #include "lib/utils/pyexec.h"
 #include "uart.h"
-
 #include "mb_ftp/mb_ftp_task.h"
 #include "mb_ftp/mb_ftp.h"
 #include "modmachine.h"
 #include "mptask.h"
 #include "mb_makeblock.h"
 #include "mb_sys.h"
-
 #include "mpthreadport.h"
-
+#include "makeblock/src/bt/device/mb_ble_device.h"
+#include "utils/mb_ringbuf.h"
 
 extern void process_serial_data(void *pvParameters); 
 
@@ -73,9 +67,9 @@ extern void process_serial_data(void *pvParameters);
 
 #define MP_TASK_STACK_SIZE      (16 * 1024)
 #define MP_TASK_STACK_LEN       (MP_TASK_STACK_SIZE / sizeof(StackType_t))
-#define MP_TASK_HEAP_SIZE       (96 * 1024)
+#define MP_TASK_HEAP_SIZE       (24 * 1024)
 
-STATIC StaticTask_t mp_task_tcb;
+// STATIC StaticTask_t mp_task_tcb;
 STATIC StackType_t mp_task_stack[MP_TASK_STACK_LEN] __attribute__((aligned (8)));
 STATIC uint8_t mp_task_heap[MP_TASK_HEAP_SIZE];
 
@@ -106,7 +100,7 @@ STATIC void sensor_updata(void *pvParameters)
         gyro_board_update();
       }
     }
-	vTaskDelay(100/ portTICK_PERIOD_MS);
+	vTaskDelay(100/portTICK_PERIOD_MS);
   }
 }
 
@@ -284,6 +278,7 @@ soft_reset:
     }
 
     for (;;) {
+		/*
         if (pyexec_mode_kind == PYEXEC_MODE_RAW_REPL) {
             if (pyexec_raw_repl() != 0) {
 				break;
@@ -295,6 +290,9 @@ soft_reset:
         }else{
             pyexec_pure_cmd_repl();
         }
+		*/
+		pyexec_pure_cmd_repl();
+		vTaskDelay( 10/portTICK_PERIOD_MS );
     }
 
     #if MICROPY_PY_THREAD
@@ -311,6 +309,7 @@ soft_reset:
     goto soft_reset;
 }
 
+/*
 STATIC void pure_cmd_task(void *pvParameter)
 {
   while(1)
@@ -319,9 +318,13 @@ STATIC void pure_cmd_task(void *pvParameter)
 	vTaskDelay(20/portTICK_PERIOD_MS);
   }
 }
+*/
+
 void app_main(void)
 {
   nvs_flash_init();
+  mb_ble_device_init();    
+  
   // TODO use xTaskCreateStatic (needs custom FreeRTOSConfig.h)
   //    xTaskCreateStaticPinnedToCore(mp_task, "mp_task", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY,
   //                                &mp_task_stack[0], &mp_task_tcb, 0);
@@ -330,6 +333,22 @@ void app_main(void)
   xTaskCreatePinnedToCore(sensor_updata, "sensor_updata", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0); 
   xTaskCreatePinnedToCore(mb_ftp_task, "mb_ftp_task", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0);
   //xTaskCreatePinnedToCore(pure_cmd_task, "pure_cmd_task", MP_TASK_STACK_LEN, NULL, MP_TASK_PRIORITY, NULL, 0);
+
+  /*
+  while( 1 ) {
+	int t_c = mb_get_ble_char();
+	if ( -1 != t_c ) {
+		printf( "%c", (uint8_t)t_c );
+		continue;
+	}
+
+
+	printf( "." );
+	vTaskDelay( 100/portTICK_PERIOD_MS );
+	fflush(stdout);
+  }
+  */
+
 }
 
 void nlr_jump_fail(void *val) {

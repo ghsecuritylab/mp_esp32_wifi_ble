@@ -47,7 +47,7 @@
 #include "esp32_mphal.h"
 
 #include "mb_processcmd.h"
-
+#include "makeblock/src/bt/device/mb_ble_device.h"
 
 
 /******************************************************************************
@@ -153,6 +153,9 @@ void process_serial_data(void *pvParameters)
         //mp_hal_stdout_tx_strn((const char*)data,len);
 	  }
 	  memcpy(read_buffer_data,data,len);
+	  
+	  for ( int i = 0; i < len; i++ )
+	    mb_push_to_ble( data[i] );
     }
 	vTaskDelay(20/portTICK_PERIOD_MS);
   }

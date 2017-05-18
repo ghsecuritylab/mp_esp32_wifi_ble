@@ -26,7 +26,8 @@
 
 #include "lib/oofatfs/ff.h"
 #include "extmod/vfs_fat.h"
-
+#include "makeblock/src/bt/device/mb_ble_device.h"
+#include "mptask.h"
 //#include "diskio.h"
 //#include "ffconf.h"
 
@@ -52,13 +53,14 @@ union
   int16_t shortVal;
 }valShort;
 
-
 /******************************************************************************
  DEFINE PUBLIC FUNCTIONS
  ******************************************************************************/
+uint8_t			ctrl_mode = CTRL_MODE_UART;
 char            test_data[1024]=" "; 
 char	        py_data[128] =" ";
 FATFS           sflash_fatfs;
+
 
 static uint8_t  prec;
 static uint8_t  dataLen;
@@ -110,7 +112,12 @@ float readFloat(int16_t idx)
 void writeSerial(uint8_t ch)
 {
   const char data = ch;
-  uart_write_bytes(UART_NUM_1,(const char*)&data,1);
+  if ( CTRL_MODE_UART == ctrl_mode ) {
+  	uart_write_bytes(UART_NUM_1,(const char*)&data,1);
+  }
+  else {
+  	// write to ble notify
+  }
 }
 
 void sendByte(uint8_t ch)
@@ -186,7 +193,16 @@ void readSensor(uint8_t device)
   //uint8_t dataLen = readBuffer(2);
   switch(device)
   {
-    case MICROPYTHON_ESP32:
+    case VERSION:
+      {
+		write_head();
+		for ( int i = 2; i < 6; i++ ) {
+          write_serial( readBuffer( i ));
+		}
+      }
+	  break;
+
+	case MICROPYTHON_ESP32:
       {
         //just for test;
       }
@@ -473,7 +489,7 @@ void parseData(void)
 {
   uint8_t action = readBuffer(4);
   uint8_t device = readBuffer(5);
-  //printf("data:%d,%d,%d\r\n",py_data[2],py_data[3],py_data[4]);
+  printf("data:%d,%d,%d\r\n",py_data[2],py_data[3],py_data[4]);
   switch(action)
   {
     case GET_CMD:
@@ -491,7 +507,22 @@ void parseData(void)
 
 void pyexec_pure_cmd_repl(void)
 {
-  byte c = mp_hal_stdin_rx_chr();
+  int t_c;
+  byte c;
+
+  if ( CTRL_MODE_UART == ctrl_mode ) 
+  {
+	t_c = ringbuf_get(&stdin_ringbuf);
+  }
+  else 
+  {
+  	t_c = mb_get_ble_char();
+  }
+  
+  if ( -1 == t_c )
+	  return;
+
+  c = (byte)t_c;
   if((c == START_FRAME_2) && (isStart == false))
   {
     if(prec == START_FRAME_1)
@@ -531,6 +562,16 @@ void pyexec_pure_cmd_repl(void)
 	memset(py_data,0,128);
   }
 
+}
+
+void pyexec_set_ctrl_mode( uint8_t mode )
+{
+	ctrl_mode = mode;
+}
+
+uint8_t pyexec_get_ctrl_mode( void )
+{
+  return ctrl_mode;
 }
 
 

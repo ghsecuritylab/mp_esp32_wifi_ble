@@ -41,6 +41,8 @@ __attribute__((always_inline)) static inline uint32_t mp_hal_ticks_cpu(void) {
   return ccount;
 }
 
+int mp_hal_stdin_read_rb( void );
+
 void mp_hal_delay_us(uint32_t);
 void mp_hal_delay_us_fast(uint32_t);
 void mp_hal_set_interrupt_char(int c);
